@@ -1,4 +1,4 @@
-# ecommerce_app
+# FixNet
 
 A new Flutter project.
 

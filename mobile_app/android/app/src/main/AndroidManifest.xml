@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.ecommerce_app">
+    package="com.example.FixNet">
    <application
-        android:label="ecommerce_app"
+        android:label="FixNet"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
