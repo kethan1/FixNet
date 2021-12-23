@@ -62,6 +62,31 @@ class GlobalVars {
               Navigator.pushNamed(context, "/signup");
             },
           ),
+          ListTile(
+            title: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Icon(Icons.home),
+                Text(" Login", style: bigFont),
+              ],
+            ),
+            onTap: () {
+              Navigator.pushNamed(context, "/login");
+            },
+          ),
+          ListTile(
+            title: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Icon(Icons.home),
+                Text(" Logout", style: bigFont),
+              ],
+            ),
+            onTap: () {
+              UserInfo().logout();
+              Navigator.pushNamed(context, "/");
+            },
+          ),
         ],
       ),
     );
@@ -69,60 +94,6 @@ class GlobalVars {
 
   GlobalVars._internal();
 }
-
-// class CartObjs {
-//   List<String> inCart = [];
-//   dynamic prefs;
-//   bool initialized = false;
-//   Future? _doneFuture;
-
-//   init() async {
-//     if (!initialized) {
-//       prefs = await SharedPreferences.getInstance();
-//       if (prefs.getStringList("inCart") == null) {
-//         prefs.setStringList("inCart", <String>[]);
-//       } else {
-//         inCart = List<String>.from(prefs.getStringList("inCart")!);
-//       }
-//       initialized = true;
-//     }
-//   }
-
-//   static final CartObjs _singleton = CartObjs._internal();
-
-//   factory CartObjs() {
-//     _singleton._doneFuture = _singleton.init();
-//     return _singleton;
-//   }
-
-//   CartObjs._internal();
-
-//   Future<List<String>> getItemsFromCart() async {
-//     if (!initialized) {
-//       await _doneFuture;
-//     }
-//     return prefs.getStringList("inCart");
-//   }
-
-//   Future<void> addItemtoCart(String title) async {
-//     if (!initialized) {
-//       await _doneFuture;
-//     }
-//     List itemsInCart = await getItemsFromCart();
-//     if (!itemsInCart.contains(title)) {
-//       inCart.add(title);
-//     }
-//     prefs.setStringList("inCart", inCart);
-//   }
-
-//   void removeItemFromCart(String title) async {
-//     if (!initialized) {
-//       await _doneFuture;
-//     }
-//     inCart.remove(title);
-//     prefs.setStringList("inCart", inCart);
-//   }
-// }
 
 class CartObjs {
   List<String> inCart = [];

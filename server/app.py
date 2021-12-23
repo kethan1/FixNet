@@ -40,8 +40,8 @@ def signup():
     password = request.json["password"]
     email = request.json["email"]
     current_time = datetime.datetime.now()
-    if mongo.db.movies.find_one({"email": email}) is None:
-        mongo.db.movies.insert_one({
+    if mongo.db.users.find_one({"email": email}) is None:
+        mongo.db.users.insert_one({
             "firstname": firstname,
             "lastname": lastname,
             "password": password,
@@ -57,7 +57,7 @@ def signup():
 def login():
     password = request.json["password"]
     email = request.json["email"]
-    if mongo.db.movies.find_one({"email": email, "password": password}) is not None:
+    if mongo.db.users.find_one({"email": email, "password": password}) is not None:
         return {"errorCode": 0, "success": True}
     return {"errorCode": 2, "success": False, "message": "Email or password is wrong"}
 
@@ -67,8 +67,8 @@ def add_item_to_cart():
     password = request.json["password"]
     email = request.json["email"]
     item = request.json["item"]
-    if mongo.db.movies.find_one({"email": email, "password": password}) is not None:
-        mongo.db.movies.update_one(
+    if mongo.db.users.find_one({"email": email, "password": password}) is not None:
+        mongo.db.users.update_one(
             {"email": email, "password": password},
             {"$push": {"cart": item}},
         )

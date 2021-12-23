@@ -21,8 +21,9 @@ class MyApp extends StatelessWidget {
       ),
       home: const HomePageAndShop(title: "FixNet"),
       routes: <String, WidgetBuilder>{
-        "/cart": (context) => Cart(title: "FixNet"),
-        "/signup": (context) => SignUp(title: "FixNet"),
+        "/cart": (context) => const Cart(title: "FixNet"),
+        "/signup": (context) => const SignUp(title: "FixNet"),
+        "/login": (context) => const Login(title: "FixNet"),
       },
     );
   }
@@ -701,9 +702,51 @@ class SignUp extends StatefulWidget {
 }
 
 class _SignUpState extends State<SignUp> {
+  final firstName = TextEditingController();
+  final lastName = TextEditingController();
+  final email = TextEditingController();
+  final password = TextEditingController();
+  final confirmPassword = TextEditingController();
   static const _bigFont = TextStyle(fontSize: 24.0);
   static const _mediumFont = TextStyle(fontSize: 18.5);
   static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
+
+  @override
+  void dispose() {
+    // Clean up the controller when the widget is removed from the
+    // widget tree.
+    firstName.dispose();
+    lastName.dispose();
+    email.dispose();
+    password.dispose();
+    super.dispose();
+  }
+
+  void signup() async {
+    if (firstName.text.isEmpty ||
+        lastName.text.isEmpty ||
+        email.text.isEmpty ||
+        password.text.isEmpty ||
+        confirmPassword.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text("Please fill in all fields"),
+      ));
+    } else if (password.text != confirmPassword.text) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text("Confirm Password Does Not Match Password"),
+      ));
+    } else {
+      Map<String, bool> signupResponse = await UserInfo()
+          .signup(firstName.text, lastName.text, email.text, password.text);
+      if (signupResponse["success"]!) {
+        Navigator.pushNamed(context, "/");
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Account with That Email Already Exists"),
+        ));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -713,11 +756,112 @@ class _SignUpState extends State<SignUp> {
         title: Text(widget.title),
       ),
       body: Column(
-        children: const [
+        children: [
           TextField(
-            decoration: InputDecoration(
-              border: OutlineInputBorder(),
-              hintText: 'Username'
+            controller: firstName,
+            decoration: const InputDecoration(
+                border: OutlineInputBorder(), hintText: 'First Name'),
+          ),
+          TextField(
+            controller: lastName,
+            decoration: const InputDecoration(
+                border: OutlineInputBorder(), hintText: 'Last Name'),
+          ),
+          TextField(
+            controller: email,
+            decoration: const InputDecoration(
+                border: OutlineInputBorder(), hintText: 'Email'),
+          ),
+          TextField(
+            controller: password,
+            obscureText: true,
+            enableSuggestions: false,
+            autocorrect: false,
+            decoration: const InputDecoration(
+                border: OutlineInputBorder(), hintText: 'Password'),
+          ),
+          TextField(
+            controller: confirmPassword,
+            obscureText: true,
+            enableSuggestions: false,
+            autocorrect: false,
+            decoration: const InputDecoration(
+                border: OutlineInputBorder(), hintText: 'Confirm Password'),
+          ),
+          ElevatedButton(
+            onPressed: () => signup(),
+            child: const Text(
+              'Sign Up',
+              style: _mediumFont,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class Login extends StatefulWidget {
+  const Login({Key? key, required this.title}) : super(key: key);
+
+  final String title;
+
+  @override
+  _LoginState createState() => _LoginState();
+}
+
+class _LoginState extends State<Login> {
+  final email = TextEditingController();
+  final password = TextEditingController();
+  static const _bigFont = TextStyle(fontSize: 24.0);
+  static const _mediumFont = TextStyle(fontSize: 18.5);
+  static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
+
+  void login() async {
+    if (email.text.isEmpty || password.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text("Please fill in all fields"),
+      ));
+    } else {
+      Map<String, bool> loginResponse =
+          await UserInfo().login(email.text, password.text);
+      if (loginResponse["success"]!) {
+        Navigator.pushNamed(context, "/");
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Invalid Email or Password"),
+        ));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      drawer: GlobalVars().drawer(context, bigFont: _bigFont),
+      appBar: AppBar(
+        title: Text(widget.title),
+      ),
+      body: Column(
+        children: [
+          TextField(
+            controller: email,
+            decoration: const InputDecoration(
+                border: OutlineInputBorder(), hintText: 'Email'),
+          ),
+          TextField(
+            controller: password,
+            obscureText: true,
+            enableSuggestions: false,
+            autocorrect: false,
+            decoration: const InputDecoration(
+                border: OutlineInputBorder(), hintText: 'Password'),
+          ),
+          ElevatedButton(
+            onPressed: () => login(),
+            child: const Text(
+              'Login',
+              style: _mediumFont,
             ),
           ),
         ],
