@@ -284,7 +284,18 @@ class _MoreInfoState extends State<MoreInfo> {
                     right: 0,
                     child: GestureDetector(
                         onTap: () async {
-                          await CartObjs().addItemtoCart(widget.itemTitle);
+                          Map<String, dynamic> response =
+                              await UserInfo().addItemToCart(widget.itemTitle);
+                          if (!response["success"]) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(response["message"]),
+                            ));
+                          } else {
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(const SnackBar(
+                              content: Text("Added to Cart!"),
+                            ));
+                          }
                         },
                         child: const Text("Add to Cart", style: _mediumFont)),
                   )
@@ -557,7 +568,16 @@ class _CartState extends State<Cart> {
   static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
 
   Future<void> getItems() async {
-    itemsInCart = await CartObjs().getItemsFromCart();
+    Map<String, dynamic> cartItems = await UserInfo().getCartItems();
+    if (cartItems["success"]) {
+      itemsInCart = cartItems["items"];
+    } else {
+      if (cartItems["message"]! == "Server timed out") {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Server Timed Out"),
+        ));
+      }
+    }
   }
 
   List<Widget> getWidgetItems() {
@@ -566,7 +586,7 @@ class _CartState extends State<Cart> {
     for (var map in MoviesData().movies!) {
       titleToIndex[map["title"]] = map;
     }
-    if (itemsInCart != null) {
+    if (itemsInCart != null && itemsInCart!.isNotEmpty) {
       List<double> prices = [];
       for (String item in itemsInCart!) {
         widgets.add(Row(
@@ -617,6 +637,9 @@ class _CartState extends State<Cart> {
           ),
         ),
       ));
+    } else {
+      widgets
+          .add(const Center(child: Text("No Items in Cart", style: _bigFont)));
     }
     return widgets;
   }
@@ -713,8 +736,6 @@ class _SignUpState extends State<SignUp> {
 
   @override
   void dispose() {
-    // Clean up the controller when the widget is removed from the
-    // widget tree.
     firstName.dispose();
     lastName.dispose();
     email.dispose();
@@ -736,14 +757,20 @@ class _SignUpState extends State<SignUp> {
         content: Text("Confirm Password Does Not Match Password"),
       ));
     } else {
-      Map<String, bool> signupResponse = await UserInfo()
+      Map<String, dynamic> signupResponse = await UserInfo()
           .signup(firstName.text, lastName.text, email.text, password.text);
       if (signupResponse["success"]!) {
         Navigator.pushNamed(context, "/");
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text("Account with That Email Already Exists"),
-        ));
+        if (signupResponse["message"]! == "User Already Exists") {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Account with That Email Already Exists"),
+          ));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Could Not Connect to the Server"),
+          ));
+        }
       }
     }
   }
@@ -755,47 +782,89 @@ class _SignUpState extends State<SignUp> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: Column(
-        children: [
-          TextField(
-            controller: firstName,
-            decoration: const InputDecoration(
-                border: OutlineInputBorder(), hintText: 'First Name'),
-          ),
-          TextField(
-            controller: lastName,
-            decoration: const InputDecoration(
-                border: OutlineInputBorder(), hintText: 'Last Name'),
-          ),
-          TextField(
-            controller: email,
-            decoration: const InputDecoration(
-                border: OutlineInputBorder(), hintText: 'Email'),
-          ),
-          TextField(
-            controller: password,
-            obscureText: true,
-            enableSuggestions: false,
-            autocorrect: false,
-            decoration: const InputDecoration(
-                border: OutlineInputBorder(), hintText: 'Password'),
-          ),
-          TextField(
-            controller: confirmPassword,
-            obscureText: true,
-            enableSuggestions: false,
-            autocorrect: false,
-            decoration: const InputDecoration(
-                border: OutlineInputBorder(), hintText: 'Confirm Password'),
-          ),
-          ElevatedButton(
-            onPressed: () => signup(),
-            child: const Text(
-              'Sign Up',
-              style: _mediumFont,
+      body: Padding(
+        padding: const EdgeInsets.only(left: 12.0, right: 12.0, top: 25.0),
+        child: Column(
+          children: [
+            const Text("Signup", style: _bigFont),
+            const Spacer(flex: 23),
+            TextField(
+              controller: firstName,
+              enableSuggestions: false,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: 'First Name',
+                border: OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey, width: 1.0),
+                ),
+              ),
             ),
-          ),
-        ],
+            const Spacer(),
+            TextField(
+              controller: lastName,
+              enableSuggestions: false,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: 'Last Name',
+                border: OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey, width: 1.0),
+                ),
+              ),
+            ),
+            const Spacer(),
+            TextField(
+              controller: email,
+              enableSuggestions: false,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey, width: 1.0),
+                ),
+              ),
+            ),
+            const Spacer(),
+            TextField(
+              controller: password,
+              enableSuggestions: false,
+              autocorrect: false,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey, width: 1.0),
+                ),
+              ),
+            ),
+            const Spacer(),
+            TextField(
+              controller: confirmPassword,
+              enableSuggestions: false,            
+              autocorrect: false,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Comfirm Password',
+                border: OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey, width: 1.0),
+                ),
+              ),
+            ),
+            const Spacer(),
+            ElevatedButton(
+              onPressed: () => signup(),
+              child: const Text(
+                'Sign Up',
+                style: _mediumFont,
+              ),
+            ),
+            const Spacer(flex: 28),
+          ],
+        ),
       ),
     );
   }
@@ -817,20 +886,33 @@ class _LoginState extends State<Login> {
   static const _mediumFont = TextStyle(fontSize: 18.5);
   static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
 
+  @override
+  void dispose() {
+    email.dispose();
+    password.dispose();
+    super.dispose();
+  }
+
   void login() async {
     if (email.text.isEmpty || password.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text("Please fill in all fields"),
       ));
     } else {
-      Map<String, bool> loginResponse =
+      Map<String, dynamic> loginResponse =
           await UserInfo().login(email.text, password.text);
       if (loginResponse["success"]!) {
         Navigator.pushNamed(context, "/");
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text("Invalid Email or Password"),
-        ));
+        if (loginResponse["message"]!.toString() == "Invalid credentials") {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Invalid Email or Password"),
+          ));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Could Not Connect to the Server"),
+          ));
+        }
       }
     }
   }
@@ -842,30 +924,81 @@ class _LoginState extends State<Login> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
+      body: Padding(
+        padding: const EdgeInsets.only(left: 12.0, right: 12.0, top: 25.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Text("Login", style: _bigFont),
+            const Spacer(flex: 55),
+            TextField(
+              controller: email,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey, width: 1.0),
+                ),
+              ),
+            ),
+            const Spacer(),
+            TextField(
+              controller: password,
+              obscureText: true,
+              enableSuggestions: false,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey, width: 1.0),
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => login(),
+              child: const Text(
+                'Login',
+                style: _mediumFont,
+              ),
+            ),
+            const Spacer(flex: 65),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MyLibrary extends StatefulWidget {
+  const MyLibrary({Key? key, required this.title}) : super(key: key);
+
+  final String title;
+
+  @override
+  _MyLibraryState createState() => _MyLibraryState();
+}
+
+class _MyLibraryState extends State<MyLibrary> {
+  static const _bigFont = TextStyle(fontSize: 24.0);
+  static const _mediumFont = TextStyle(fontSize: 18.5);
+  static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      drawer: GlobalVars().drawer(context, bigFont: _bigFont),
+      appBar: AppBar(
+        title: Text(widget.title),
+      ),
       body: Column(
         children: [
-          TextField(
-            controller: email,
-            decoration: const InputDecoration(
-                border: OutlineInputBorder(), hintText: 'Email'),
-          ),
-          TextField(
-            controller: password,
-            obscureText: true,
-            enableSuggestions: false,
-            autocorrect: false,
-            decoration: const InputDecoration(
-                border: OutlineInputBorder(), hintText: 'Password'),
-          ),
-          ElevatedButton(
-            onPressed: () => login(),
-            child: const Text(
-              'Login',
-              style: _mediumFont,
-            ),
-          ),
-        ],
-      ),
+          
+        ]
+      )
     );
   }
 }
