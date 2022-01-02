@@ -4,6 +4,7 @@ import datetime
 from dotenv import load_dotenv
 from flask import *
 from flask_pymongo import PyMongo
+from flask_cors import CORS
 from gridfs import GridFS
 
 if "DYNO" not in os.environ:
@@ -12,6 +13,7 @@ if "DYNO" not in os.environ:
 app = Flask(__name__)
 app.config["MONGO_URI"] = f"mongodb+srv://{os.environ['user']}:{os.environ['password']}@full-stack-web-developm.m7o9n.mongodb.net/ecommerce_app?retryWrites=true&w=majority"
 mongo = PyMongo(app)
+cors = CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 
 @app.route("/api/v1/get_movies")
