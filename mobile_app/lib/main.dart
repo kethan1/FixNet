@@ -3,6 +3,7 @@ import "package:http/http.dart" as http;
 import "dart:convert";
 import "package:flutter_rating_bar/flutter_rating_bar.dart";
 import "package:collection/collection.dart";
+import 'package:video_player/video_player.dart';
 import "global.dart";
 
 void main() {
@@ -24,6 +25,7 @@ class MyApp extends StatelessWidget {
         "/cart": (context) => const Cart(title: "FixNet"),
         "/signup": (context) => const SignUp(title: "FixNet"),
         "/login": (context) => const Login(title: "FixNet"),
+        "/library": (context) => const MyLibrary(title: "FixNet"),
       },
     );
   }
@@ -474,8 +476,6 @@ class _AddReviewState extends State<AddReview> {
 
   @override
   void dispose() {
-    // Clean up the controller when the widget is removed from the
-    // widget tree.
     myController.dispose();
     super.dispose();
   }
@@ -608,7 +608,7 @@ class _CartState extends State<Cart> {
         ));
         prices.add(titleToIndex[item]!['cost']);
       }
-      double totalPrice = prices.sum / prices.length;
+      double totalPrice = double.parse(prices.sum.toStringAsFixed(2));
       widgets.add(const Divider(
         height: 40,
         thickness: 5,
@@ -630,7 +630,13 @@ class _CartState extends State<Cart> {
       widgets.add(Container(
         margin: const EdgeInsets.only(left: 20.0, right: 20.0, top: 40.0),
         child: ElevatedButton(
-          onPressed: () {},
+          onPressed: () async {
+            for (String item in itemsInCart!) {
+              await UserInfo().removeItemFromCart(item);
+              await UserInfo().addItemToLibrary(item);
+            }
+            Navigator.pushNamed(context, "/");
+          },
           child: const Text(
             'Checkout',
             style: _mediumFont,
@@ -664,7 +670,9 @@ class _CartState extends State<Cart> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: const [
-                      Text("Loading...", style: _mediumButBiggerFont),
+                      Center(
+                          child:
+                              Text("Loading...", style: _mediumButBiggerFont)),
                     ],
                   );
                 case ConnectionState.waiting:
@@ -672,7 +680,9 @@ class _CartState extends State<Cart> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: const [
-                      Text("Loading...", style: _mediumButBiggerFont),
+                      Center(
+                          child:
+                              Text("Loading...", style: _mediumButBiggerFont)),
                     ],
                   );
                 default:
@@ -682,14 +692,14 @@ class _CartState extends State<Cart> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         GestureDetector(
-                          onTap: () {
-                            getItems();
+                          onTap: () async {
+                            await getItems();
                             setState(() {});
                           },
                           child: Wrap(
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: const [
-                              Text("Unable to load cart items. Tap to retry.",
+                              Text("Unable to load cart. Tap to retry.",
                                   style: _mediumButBiggerFont),
                               Icon(Icons.refresh_rounded),
                             ],
@@ -843,7 +853,7 @@ class _SignUpState extends State<SignUp> {
             const Spacer(),
             TextField(
               controller: confirmPassword,
-              enableSuggestions: false,            
+              enableSuggestions: false,
               autocorrect: false,
               obscureText: true,
               decoration: const InputDecoration(
@@ -983,9 +993,63 @@ class MyLibrary extends StatefulWidget {
 }
 
 class _MyLibraryState extends State<MyLibrary> {
+  List<String> myLibrary = [];
   static const _bigFont = TextStyle(fontSize: 24.0);
   static const _mediumFont = TextStyle(fontSize: 18.5);
   static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
+
+  Future<void> getLibrary() async {
+    Map<String, dynamic> libraryItemsResponse =
+        await UserInfo().getLibraryItems();
+    if (libraryItemsResponse["success"]) {
+      myLibrary = libraryItemsResponse["items"];
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text("Could Not Connect to the Server", style: _mediumFont),
+      ));
+    }
+  }
+
+  List<Widget> libraryLayout() {
+    List<Widget> widgets = [];
+    Map<String, Map<dynamic, dynamic>> titleToIndex = {};
+    for (var map in MoviesData().movies!) {
+      titleToIndex[map["title"]] = map;
+    }
+    if (myLibrary.isNotEmpty) {
+      for (String item in myLibrary) {
+        widgets.add(Row(
+          children: [
+            Expanded(
+                flex: 3,
+                child:
+                    MoviesData().getImage(titleToIndex[item]!["preview_pic"])),
+            const Spacer(flex: 1),
+            Expanded(
+              flex: 8,
+              child: Text(item, style: _bigFont),
+            ),
+            const Spacer(flex: 1),
+            TextButton(
+                onPressed: () {
+                  // redirect to movie page
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => WatchMovie(title: widget.title, movieTitle: item),
+                    )     
+                  );
+                },
+                child: const Text("Watch", style: _mediumFont)),
+          ],
+        ));
+      }
+    } else {
+      widgets.add(
+          const Center(child: Text("No Items in Library", style: _bigFont)));
+    }
+    return widgets;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -994,14 +1058,125 @@ class _MyLibraryState extends State<MyLibrary> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: Column(
-        children: [
-          
-        ]
-      )
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Center(
+              child: FutureBuilder(
+                future: getLibrary(),
+                builder: (context, snapshot) {
+                  switch (snapshot.connectionState) {
+                    case ConnectionState.none:
+                      return const Text("No Connection", style: _mediumFont);
+                    case ConnectionState.waiting:
+                      return const Center(child: CircularProgressIndicator());
+                    case ConnectionState.active:
+                      return const Center(child: CircularProgressIndicator());
+                    case ConnectionState.done:
+                      if (snapshot.hasError) {
+                        return GestureDetector(
+                          onTap: () async {
+                            await getLibrary();
+                            setState(() {});
+                          },
+                          child: Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: const [
+                              Text("Unable to load movies. Tap to retry.",
+                                  style: _mediumButBiggerFont),
+                              Icon(Icons.refresh_rounded),
+                            ],
+                          ),
+                        );
+                      } else {
+                        return Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: ListView(
+                              shrinkWrap: true, children: libraryLayout()),
+                        );
+                      }
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
+
+class WatchMovie extends StatefulWidget {
+  const WatchMovie({Key? key, required this.title, required this.movieTitle})
+      : super(key: key);
+
+  final String title;
+  final String movieTitle;
+
+  @override
+  _WatchMovieState createState() => _WatchMovieState();
+}
+
+class _WatchMovieState extends State<WatchMovie> {
+  VideoPlayerController? _controller;
+  bool initialized = false;
+  static const _bigFont = TextStyle(fontSize: 24.0);
+  static const _mediumFont = TextStyle(fontSize: 18.5);
+  static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.network(
+        'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4')
+      ..initialize().then(
+        (_) {
+          // Ensure the first frame is shown after the video is initialized, even before the play button has been pressed.
+          setState(() {});
+        },
+      );
+    initialized = true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      drawer: GlobalVars().drawer(context, bigFont: _bigFont),
+      appBar: AppBar(
+        title: Text(widget.title),
+      ),
+      body: Center(
+        child: initialized
+            ? AspectRatio(
+                aspectRatio: _controller!.value.aspectRatio,
+                child: VideoPlayer(_controller!),
+              )
+            : Container(),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          setState(() {
+            _controller!.value.isPlaying
+                ? _controller!.pause()
+                : _controller!.play();
+          });
+        },
+        child: Icon(
+          _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _controller!.dispose();
+  }
+}
+
 
 class UserForgot implements Exception {
   final String msg;

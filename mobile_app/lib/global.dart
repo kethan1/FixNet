@@ -1,4 +1,4 @@
-import 'dart:async';
+import "dart:async";
 
 import "package:flutter/foundation.dart" show kIsWeb;
 import "package:shared_preferences/shared_preferences.dart";
@@ -24,11 +24,11 @@ class GlobalVars {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(
+          const DrawerHeader(
+            decoration: BoxDecoration(
               color: Colors.red,
             ),
-            child: Text("Pages", style: bigFont),
+            child: Text(""),
           ),
           ListTile(
             title: Wrap(
@@ -53,12 +53,23 @@ class GlobalVars {
               ),
               onTap: () => Navigator.pushNamed(context, "/cart"),
             ),
+          if (UserInfo().signedIn)
+            ListTile(
+              title: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Icon(Icons.video_library),
+                  Text(" Library", style: bigFont),
+                ],
+              ),
+              onTap: () => Navigator.pushNamed(context, "/library"),
+            ),
           if (!UserInfo().initialized || !UserInfo().signedIn)
             ListTile(
               title: Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  const Icon(Icons.home),
+                  const Icon(Icons.login_outlined, size: 25.0),
                   Text(" Sign Up", style: bigFont),
                 ],
               ),
@@ -71,7 +82,7 @@ class GlobalVars {
               title: Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  const Icon(Icons.home),
+                  const Icon(Icons.login_outlined, size: 25.0),
                   Text(" Login", style: bigFont),
                 ],
               ),
@@ -84,7 +95,7 @@ class GlobalVars {
               title: Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  const Icon(Icons.home),
+                  const Icon(Icons.logout_outlined, size: 25.0),
                   Text(" Logout", style: bigFont),
                 ],
               ),
@@ -142,6 +153,8 @@ class UserInfo {
       } else {
         userCredentials =
             List<String>.from(prefs.getStringList("usercredentials")!);
+        await UserInfo()
+            .login(userCredentials[0], userCredentials[1], initialize: false);
       }
       initialized = true;
     }
@@ -156,8 +169,9 @@ class UserInfo {
 
   UserInfo._internal();
 
-  Future<Map<String, dynamic>> login(String email, String password) async {
-    if (!initialized) {
+  Future<Map<String, dynamic>> login(String email, String password,
+      {bool initialize = false}) async {
+    if (!initialized && !initialize) {
       await _doneFuture;
     }
     var body = json.encode({
@@ -175,7 +189,7 @@ class UserInfo {
           .post(Uri.parse(GlobalVars().serverUrl + "/api/v1/login"),
               body: body, headers: headers)
           .timeout(const Duration(seconds: 5));
-    } on TimeoutException catch(e) {
+    } on TimeoutException {
       return {"success": false, "message": "Server timed out"};
     }
 
@@ -259,9 +273,9 @@ class UserInfo {
     http.Response items;
     try {
       items = await http
-        .post(Uri.parse(GlobalVars().serverUrl + "/api/v1/get_cart_items"),
-            body: body, headers: headers)
-        .timeout(const Duration(seconds: 5));
+          .post(Uri.parse(GlobalVars().serverUrl + "/api/v1/get_cart_items"),
+              body: body, headers: headers)
+          .timeout(const Duration(seconds: 5));
     } on TimeoutException {
       return {"success": false, "message": "Server timed out"};
     }
@@ -300,6 +314,121 @@ class UserInfo {
 
     var response = await http
         .post(Uri.parse(GlobalVars().serverUrl + "/api/v1/add_item_to_cart"),
+            body: body, headers: headers)
+        .timeout(const Duration(seconds: 5));
+
+    if (response.statusCode == 200) {
+      var body = json.decode(response.body);
+      if (body["success"]) {
+        return {"success": true};
+      }
+      return {"success": false, "message": body["message"]};
+    }
+    return {"success": false, "message": "Could not complete request"};
+  }
+
+  Future<Map<String, dynamic>> removeItemFromCart(String item) async {
+    if (!initialized) {
+      await _doneFuture;
+    }
+
+    if (userCredentials.length != 2) {
+      return {
+        "success": false,
+        "message": "Please Login or Sign Up Before Removing Items from Cart"
+      };
+    }
+
+    var body = json.encode({
+      "email": userCredentials[0],
+      "password": userCredentials[1],
+      "item": item,
+    });
+
+    Map<String, String> headers = {
+      "Content-type": "application/json",
+      "Accept": "application/json",
+    };
+
+    var response = await http
+        .post(Uri.parse(GlobalVars().serverUrl + "/api/v1/remove_cart_item"),
+            body: body, headers: headers)
+        .timeout(const Duration(seconds: 5));
+
+    if (response.statusCode == 200) {
+      var body = json.decode(response.body);
+      if (body["success"]) {
+        return {"success": true};
+      } else if (body["message"] == "Item not found") {
+        return {"success": false, "message": "Item not found"};
+      }
+    }
+    return {"success": false, "message": "User not found"};
+  }
+
+  Future<Map<String, dynamic>> getLibraryItems() async {
+    if (!initialized) {
+      await _doneFuture;
+    }
+
+    if (userCredentials.length != 2) {
+      return {"success": false, "message": "Not logged in"};
+    }
+
+    var body = json.encode({
+      "email": userCredentials[0],
+      "password": userCredentials[1],
+    });
+
+    Map<String, String> headers = {
+      "Content-type": "application/json",
+      "Accept": "application/json",
+    };
+
+    http.Response items;
+    try {
+      items = await http
+          .post(Uri.parse(GlobalVars().serverUrl + "/api/v1/get_library_items"),
+              body: body, headers: headers)
+          .timeout(const Duration(seconds: 5));
+    } on TimeoutException {
+      return {"success": false, "message": "Server timed out"};
+    }
+
+    if (items.statusCode == 200) {
+      var body = json.decode(items.body);
+      if (body["success"]) {
+        return {"success": true, "items": List<String>.from(body["items"])};
+      }
+    }
+    return {"success": false, "message": "User Not Found"};
+  }
+
+  Future<Map<String, dynamic>> addItemToLibrary(String item) async {
+    if (!initialized) {
+      await _doneFuture;
+    }
+
+    if (userCredentials.length != 2) {
+      return {
+        "success": false,
+        "message": "Please Login or Sign Up Before Adding Items to Cart"
+      };
+    }
+
+    var body = json.encode({
+      "email": userCredentials[0],
+      "password": userCredentials[1],
+      "item": item,
+    });
+
+    Map<String, String> headers = {
+      "Content-type": "application/json",
+      "Accept": "application/json",
+    };
+
+    var response = await http
+        .post(Uri.parse(GlobalVars().serverUrl + "/api/v1/add_item_to_library"),
             body: body, headers: headers)
         .timeout(const Duration(seconds: 5));
 
