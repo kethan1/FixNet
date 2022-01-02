@@ -227,7 +227,6 @@ class MoreInfo extends StatefulWidget {
 class _MoreInfoState extends State<MoreInfo> {
   static const _bigFont = TextStyle(fontSize: 24.0);
   static const _mediumFont = TextStyle(fontSize: 18.5);
-  static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
 
   Widget urlToImgObj(url) {
     if (url.startsWith("data:image")) {
@@ -382,7 +381,6 @@ class Reviews extends StatefulWidget {
 class _ReviewsState extends State<Reviews> {
   static const _bigFont = TextStyle(fontSize: 24.0);
   static const _mediumFont = TextStyle(fontSize: 18.5);
-  static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
 
   List<Widget> getReviews() {
     List<Widget> widgetReviews = [];
@@ -470,7 +468,6 @@ class _AddReviewState extends State<AddReview> {
   final myController = TextEditingController();
   static const _bigFont = TextStyle(fontSize: 24.0);
   static const _mediumFont = TextStyle(fontSize: 18.5);
-  static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
 
   double rating = 0;
 
@@ -742,7 +739,6 @@ class _SignUpState extends State<SignUp> {
   final confirmPassword = TextEditingController();
   static const _bigFont = TextStyle(fontSize: 24.0);
   static const _mediumFont = TextStyle(fontSize: 18.5);
-  static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
 
   @override
   void dispose() {
@@ -894,7 +890,6 @@ class _LoginState extends State<Login> {
   final password = TextEditingController();
   static const _bigFont = TextStyle(fontSize: 24.0);
   static const _mediumFont = TextStyle(fontSize: 18.5);
-  static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
 
   @override
   void dispose() {
@@ -1124,7 +1119,6 @@ class _WatchMovieState extends State<WatchMovie> {
   bool initialized = false;
   static const _bigFont = TextStyle(fontSize: 24.0);
   static const _mediumFont = TextStyle(fontSize: 18.5);
-  static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
 
   @override
   void initState() {

@@ -10,7 +10,7 @@ class GlobalVars {
   bool debug = false;
   late String serverUrl = debug
       ? (kIsWeb ? "http://localhost:5000" : "http://10.0.2.2:5000")
-      : "http://10.0.2.2:5000";
+      : "https://fixnet.herokuapp.com";
 
   static final GlobalVars _singleton = GlobalVars._internal();
 
