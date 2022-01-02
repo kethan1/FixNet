@@ -34497,7 +34497,7 @@ if(s.$2(a,k)>0){B.c.p(j.b,b,k)
 b=p}}B.c.p(j.b,b,a)}}
 A.TK.prototype={
 gim(){var s=this.b
-if(s===$)s=this.b="http://localhost:5000"
+if(s===$)s=this.b="http://10.0.2.2:5000"
 return s},
 iI(a,b){var s,r=null,q=t.p,p=A.b([B.yB,A.ui(new A.TL(a),A.jx(B.ax,A.b([B.zv,A.c0(" Home",r,r,r,b,r,r)],q),B.ba,B.x,r))],q),o=$.jQ()
 o.d=o.cD()
