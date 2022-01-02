@@ -7,7 +7,7 @@ import "package:http/http.dart" as http;
 import "dart:convert";
 
 class GlobalVars {
-  bool debug = true;
+  bool debug = false;
   late String serverUrl = debug
       ? (kIsWeb ? "http://localhost:5000" : "http://10.0.2.2:5000")
       : "http://10.0.2.2:5000";
