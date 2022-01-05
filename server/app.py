@@ -144,7 +144,7 @@ def get_library_items():
     return {"errorCode": 3, "success": False, "message": "User not found"}
 
 
-@app.route("/api/v1/client/serve/<file_name>/", methods=["GET", "POST"])
+@app.route("/api/v1/stream_movie/<file_name>/", methods=["GET", "POST"])
 def serve_file(file_name):
     db = mongo.db
     fs = GridFS(db)

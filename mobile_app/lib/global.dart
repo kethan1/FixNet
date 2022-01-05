@@ -153,8 +153,10 @@ class UserInfo {
       } else {
         userCredentials =
             List<String>.from(prefs.getStringList("usercredentials")!);
-        await UserInfo()
+        if (userCredentials.length >= 2) {
+          await UserInfo()
             .login(userCredentials[0], userCredentials[1], initialize: false);
+        }
       }
       initialized = true;
     }

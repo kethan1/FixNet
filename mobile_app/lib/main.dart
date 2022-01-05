@@ -126,7 +126,7 @@ class _HomePageAndShopState extends State<HomePageAndShop> {
                   child: Column(
                     children: const [
                       Text(
-                        "Movies At a One Time Cost, Forever Accessible",
+                        "Movies at a One Time Cost, Forever Accessible",
                         textAlign: TextAlign.center,
                         style: _bigFont,
                       ),
@@ -384,27 +384,33 @@ class _ReviewsState extends State<Reviews> {
 
   List<Widget> getReviews() {
     List<Widget> widgetReviews = [];
-    widget.reviews.forEachIndexed((index, review) {
-      widgetReviews.add(
-        Center(
-          child: RatingBarIndicator(
-            rating: review["stars"].toDouble(),
-            itemPadding: const EdgeInsets.symmetric(horizontal: 2.0),
-            itemBuilder: (context, _) => const Icon(
-              Icons.star,
-              color: Colors.amber,
+    if (widget.reviews.isNotEmpty) {
+      widget.reviews.forEachIndexed((index, review) {
+        widgetReviews.add(
+          Center(
+            child: RatingBarIndicator(
+              rating: review["stars"].toDouble(),
+              itemPadding: const EdgeInsets.symmetric(horizontal: 2.0),
+              itemBuilder: (context, _) => const Icon(
+                Icons.star,
+                color: Colors.amber,
+              ),
             ),
           ),
-        ),
-      );
+        );
+        widgetReviews.add(
+          Center(child: Text(review["description"], style: _mediumFont)),
+        );
+        if (index != widget.reviews.length - 1) {
+          widgetReviews.add(
+              const Divider(height: 70, thickness: 0, color: Colors.white));
+        }
+      });
+    } else {
       widgetReviews.add(
-        Center(child: Text(review["description"], style: _mediumFont)),
+        const Center(child: Text("No Reviews Yet!", style: _mediumFont)),
       );
-      if (index != widget.reviews.length - 1) {
-        widgetReviews
-            .add(const Divider(height: 70, thickness: 0, color: Colors.white));
-      }
-    });
+    }
     return widgetReviews;
   }
 
@@ -415,38 +421,41 @@ class _ReviewsState extends State<Reviews> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-                child: Center(
-              child: ListView(
-                shrinkWrap: true,
-                padding: const EdgeInsets.all(20.0),
+      body: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                  child: Center(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.all(20.0),
+                  children: [
+                    ...getReviews(),
+                  ],
+                ),
+              )),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  ...getReviews(),
+                  GestureDetector(
+                      onTap: () {
+                        Navigator.push(context,
+                            MaterialPageRoute(builder: (context) {
+                          return AddReview(
+                            title: "FixNet",
+                            itemTitle: widget.itemTitle,
+                          );
+                        }));
+                      },
+                      child: const Text("Add Review", style: _mediumFont)),
                 ],
               ),
-            )),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                GestureDetector(
-                    onTap: () {
-                      Navigator.push(context,
-                          MaterialPageRoute(builder: (context) {
-                        return AddReview(
-                          title: "FixNet",
-                          itemTitle: widget.itemTitle,
-                        );
-                      }));
-                    },
-                    child: const Text("Add Review", style: _mediumFont)),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1029,11 +1038,11 @@ class _MyLibraryState extends State<MyLibrary> {
                 onPressed: () {
                   // redirect to movie page
                   Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => WatchMovie(title: widget.title, movieTitle: item),
-                    )     
-                  );
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            WatchMovie(title: widget.title, movieTitle: item),
+                      ));
                 },
                 child: const Text("Watch", style: _mediumFont)),
           ],
@@ -1124,7 +1133,7 @@ class _WatchMovieState extends State<WatchMovie> {
   void initState() {
     super.initState();
     _controller = VideoPlayerController.network(
-        'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4')
+        GlobalVars().serverUrl + "/api/v1/stream_movie/" + widget.movieTitle.toLowerCase().replaceAll(" ", ""))
       ..initialize().then(
         (_) {
           // Ensure the first frame is shown after the video is initialized, even before the play button has been pressed.
@@ -1170,7 +1179,6 @@ class _WatchMovieState extends State<WatchMovie> {
     _controller!.dispose();
   }
 }
-
 
 class UserForgot implements Exception {
   final String msg;
