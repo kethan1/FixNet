@@ -4,6 +4,7 @@ import "dart:convert";
 import "package:flutter_rating_bar/flutter_rating_bar.dart";
 import "package:collection/collection.dart";
 import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 import "global.dart";
 
 void main() {
@@ -1125,22 +1126,22 @@ class WatchMovie extends StatefulWidget {
 
 class _WatchMovieState extends State<WatchMovie> {
   VideoPlayerController? _controller;
-  bool initialized = false;
+  ChewieController? _chewieController;
+  bool controllerInitialized = false;
   static const _bigFont = TextStyle(fontSize: 24.0);
   static const _mediumFont = TextStyle(fontSize: 18.5);
 
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.network(
-        GlobalVars().serverUrl + "/api/v1/stream_movie/" + widget.movieTitle.toLowerCase().replaceAll(" ", ""))
-      ..initialize().then(
-        (_) {
-          // Ensure the first frame is shown after the video is initialized, even before the play button has been pressed.
-          setState(() {});
-        },
-      );
-    initialized = true;
+    _controller = VideoPlayerController.network(GlobalVars().serverUrl +
+        "/api/v1/stream_movie/" +
+        widget.movieTitle.toLowerCase().replaceAll(" ", ""));
+    _controller?.initialize().then((_) {
+      _chewieController = ChewieController(videoPlayerController: _controller!);
+      controllerInitialized = true;
+      setState(() {});
+    });
   }
 
   @override
@@ -1151,24 +1152,9 @@ class _WatchMovieState extends State<WatchMovie> {
         title: Text(widget.title),
       ),
       body: Center(
-        child: initialized
-            ? AspectRatio(
-                aspectRatio: _controller!.value.aspectRatio,
-                child: VideoPlayer(_controller!),
-              )
+        child: controllerInitialized
+            ? Chewie(controller: _chewieController!)
             : Container(),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          setState(() {
-            _controller!.value.isPlaying
-                ? _controller!.pause()
-                : _controller!.play();
-          });
-        },
-        child: Icon(
-          _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
-        ),
       ),
     );
   }
@@ -1177,6 +1163,7 @@ class _WatchMovieState extends State<WatchMovie> {
   void dispose() {
     super.dispose();
     _controller!.dispose();
+    _chewieController!.dispose();
   }
 }
 
