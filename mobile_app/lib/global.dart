@@ -7,7 +7,7 @@ import "package:http/http.dart" as http;
 import "dart:convert";
 
 class GlobalVars {
-  bool debug = false;
+  bool debug = true;
   late String serverUrl = debug
       ? (kIsWeb ? "http://localhost:5000" : "http://10.0.2.2:5000")
       : "https://fixnet.herokuapp.com";
@@ -125,14 +125,16 @@ class MoviesData {
     this.movies = movies;
   }
 
-  Widget getImage(String image) {
-    if (image.startsWith("data:image")) {
-      return Image.memory(
-        base64Decode(image.split(",").last),
-      );
-    } else {
-      return Image.network(image);
-    }
+  Widget getImage(String image, {bool fullSize = false}) {
+    return Image.network(
+      "${GlobalVars().serverUrl}/api/v1/get_movie_poster/$image-${fullSize ? 'horizontal' : 'vertical'}",
+    );
+  }
+
+  ImageProvider getImageProvider(String image, {bool fullSize = false}) {
+    return NetworkImage(
+      "${GlobalVars().serverUrl}/api/v1/get_movie_poster/$image-${fullSize ? 'horizontal' : 'vertical'}",
+    );
   }
 
   MoviesData._internal();
@@ -155,7 +157,7 @@ class UserInfo {
             List<String>.from(prefs.getStringList("usercredentials")!);
         if (userCredentials.length >= 2) {
           await UserInfo()
-            .login(userCredentials[0], userCredentials[1], initialize: false);
+              .login(userCredentials[0], userCredentials[1], initialize: false);
         }
       }
       initialized = true;

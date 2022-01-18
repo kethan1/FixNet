@@ -1,10 +1,14 @@
 import "package:flutter/material.dart";
 import "package:http/http.dart" as http;
 import "dart:convert";
+import "dart:math";
 import "package:flutter_rating_bar/flutter_rating_bar.dart";
 import "package:collection/collection.dart";
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:carousel_slider/carousel_slider.dart';
+import 'package:image_pixels/image_pixels.dart';
+import 'package:intersperse/intersperse.dart';
 import "global.dart";
 
 void main() {
@@ -21,7 +25,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.red,
       ),
-      home: const HomePageAndShop(title: "FixNet"),
+      home: const HomePage(title: "FixNet"),
       routes: <String, WidgetBuilder>{
         "/cart": (context) => const Cart(title: "FixNet"),
         "/signup": (context) => const SignUp(title: "FixNet"),
@@ -32,21 +36,24 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class HomePageAndShop extends StatefulWidget {
-  const HomePageAndShop({Key? key, required this.title}) : super(key: key);
+class HomePage extends StatefulWidget {
+  const HomePage({Key? key, required this.title}) : super(key: key);
 
   final String title;
 
   @override
-  _HomePageAndShopState createState() => _HomePageAndShopState();
+  _HomePageState createState() => _HomePageState();
 }
 
-class _HomePageAndShopState extends State<HomePageAndShop> {
+class _HomePageState extends State<HomePage> {
   static const _bigFont = TextStyle(fontSize: 24.0);
   static const _mediumFont = TextStyle(fontSize: 18.5);
   static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
+  final CarouselController _controller = CarouselController();
 
   List<dynamic>? movies;
+  List<dynamic>? featuredMovies;
+  final ValueNotifier<int> _current = ValueNotifier<int>(0);
 
   Future getMovies() async {
     var url = Uri.parse("${GlobalVars().serverUrl}/api/v1/get_movies");
@@ -57,54 +64,138 @@ class _HomePageAndShopState extends State<HomePageAndShop> {
     }
   }
 
+  Future getFeaturedMovies() async {
+    await getMovies();
+    var url = Uri.parse("${GlobalVars().serverUrl}/api/v1/get_featured_movies");
+    var response = await http.get(url).timeout(const Duration(seconds: 5));
+    if (response.statusCode == 200) {
+      featuredMovies = json.decode(response.body);
+    }
+  }
+
+  List<Widget> getFeaturedMovieWidgets() {
+    List<Widget> widgets = [];
+
+    for (var movie in featuredMovies!) {
+      for (var map in movies!) {
+        if (map["title"] == movie) {
+          ImageProvider imageProviderWidget =
+              MoviesData().getImageProvider(map["poster"], fullSize: true);
+          widgets.add(GestureDetector(
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) {
+                return MoreInfo(
+                  title: "FixNet",
+                  itemTitle: map["title"],
+                  moviesInfo: map,
+                );
+              }));
+            },
+            child: Container(
+              margin: const EdgeInsets.all(5),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20.0),
+                child: ImagePixels(
+                  imageProvider: imageProviderWidget,
+                  defaultColor: Colors.grey,
+                  builder: (context, img) => SizedBox(
+                    width: img.hasImage ? 375 : 0,
+                    height: img.hasImage
+                        ? min((img.width! / 375) * img.height!, 180)
+                        : 0,
+                    child: Image(
+                      image: imageProviderWidget,
+                      fit: BoxFit.fill,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ));
+          break;
+        }
+      }
+    }
+
+    return widgets;
+  }
+
   List<Widget> getMovieWidgets() {
     List<Widget> widgets = [];
-    if (movies != null) {
-      widgets.add(
-        const Divider(
-          height: 50,
-          thickness: 0,
-          color: Colors.white,
-        ),
-      );
 
-      movies!.asMap().forEach((index, movie) {
-        Widget imageWidget = MoviesData().getImage(movie["preview_pic"]);
-        widgets.add(GestureDetector(
-          onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (context) {
-              return MoreInfo(
-                title: "FixNet",
-                itemTitle: movie["title"],
-                moviesInfo: movie,
-              );
-            }));
-          },
-          child: Column(
-            children: [
-              Text(movie["title"] + "\n", style: _mediumButBiggerFont),
-              imageWidget,
-            ],
-          ),
-        ));
-        if (index != movies!.length - 1) {
-          widgets.add(
-            const Divider(
-              height: 50,
-              thickness: 5,
+    widgets.add(const SizedBox(height: 50));
+
+    var moviesGroupedByGenre = groupBy(movies!, (dynamic obj) => obj['genre']);
+
+    moviesGroupedByGenre.forEach((genre, movies) {
+      var moviesNotInFeatured = movies
+          .where(
+              (movie) => !(featuredMovies?.contains(movie['title']) ?? false))
+          .toList();
+      if (moviesNotInFeatured.isEmpty) {
+        return;
+      }
+
+      widgets.add(Center(
+        child: Text(
+          genre,
+          style: _bigFont,
+        ),
+      ));
+      widgets.add(const Divider(
+        height: 10,
+        thickness: 2,
+      ));
+
+      List<Widget> genreMovies = [];
+
+      for (var movie in movies) {
+        ImageProvider imageProviderWidget =
+            MoviesData().getImageProvider(movie["poster"], fullSize: false);
+        if (!(featuredMovies?.contains(movie["title"]) ?? true)) {
+          genreMovies.add(GestureDetector(
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) {
+                return MoreInfo(
+                  title: "FixNet",
+                  itemTitle: movie["title"],
+                  moviesInfo: movie,
+                );
+              }));
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20.0),
+              child: ImagePixels(
+                imageProvider: imageProviderWidget,
+                defaultColor: Colors.grey,
+                builder: (context, img) => SizedBox(
+                  width: img.hasImage ? 185 : 0,
+                  height: img.hasImage ? (185 / img.width!) * img.height! : 0,
+                  child: Image(image: imageProviderWidget, fit: BoxFit.fill),
+                ),
+              ),
             ),
-          );
+          ));
         }
-      });
+      }
 
-      widgets.add(
-        const Divider(
-          height: 15,
-          thickness: 0,
-          color: Color.fromRGBO(255, 255, 255, 1.0),
-        ),
-      );
-    }
+      widgets.add(SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(children: [
+          const SizedBox(width: 10),
+          ...genreMovies.intersperse(const SizedBox(width: 30)).toList(),
+          const SizedBox(width: 10)
+        ]),
+      ));
+
+      widgets.add(const Divider(
+        height: 10,
+        thickness: 2,
+      ));
+    });
+
+    widgets.add(const SizedBox(height: 15));
+
     return widgets;
   }
 
@@ -113,6 +204,13 @@ class _HomePageAndShopState extends State<HomePageAndShop> {
     return Scaffold(
       drawer: GlobalVars().drawer(context, bigFont: _bigFont),
       appBar: AppBar(
+        actions: [
+          Container(
+            child: (ModalRoute.of(context)?.canPop ?? false)
+                ? const BackButton()
+                : null,
+          )
+        ],
         title: Text(widget.title),
       ),
       body: Column(
@@ -141,11 +239,123 @@ class _HomePageAndShopState extends State<HomePageAndShop> {
               ),
             ],
           ),
+          const SizedBox(height: 30),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                Expanded(
+                  child: FutureBuilder(
+                    future: getFeaturedMovies(),
+                    builder: (BuildContext context, AsyncSnapshot snapshot) {
+                      switch (snapshot.connectionState) {
+                        case ConnectionState.none:
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: const [
+                              Text("Connecting...",
+                                  style: _mediumButBiggerFont),
+                            ],
+                          );
+                        case ConnectionState.waiting:
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: const [
+                              Text("Loading...", style: _mediumButBiggerFont),
+                            ],
+                          );
+                        default:
+                          if (snapshot.hasError) {
+                            return Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                GestureDetector(
+                                  onTap: () {
+                                    getMovies();
+                                    setState(() {});
+                                  },
+                                  child: Wrap(
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    children: const [
+                                      Icon(Icons.refresh_rounded),
+                                      Text("Network Error",
+                                          style: _mediumButBiggerFont),
+                                    ],
+                                  ),
+                                )
+                              ],
+                            );
+                          } else {
+                            var items = getFeaturedMovieWidgets();
+                            return Column(
+                              children: [
+                                Expanded(
+                                  child: CarouselSlider(
+                                    items: items,
+                                    carouselController: _controller,
+                                    options: CarouselOptions(
+                                      height: 300,
+                                      viewportFraction: 1,
+                                      enableInfiniteScroll:
+                                          items.length == 1 ? false : true,
+                                      autoPlay: true,
+                                      autoPlayInterval:
+                                          const Duration(seconds: 3),
+                                      autoPlayAnimationDuration:
+                                          const Duration(milliseconds: 400),
+                                      enlargeCenterPage: true,
+                                      onPageChanged: (index, reason) {
+                                        _current.value = index;
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                ValueListenableBuilder<int>(
+                                  valueListenable: _current,
+                                  builder: (context, value, widget) {
+                                    return Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children:
+                                          items.asMap().entries.map((entry) {
+                                        return GestureDetector(
+                                          onTap: () => _controller
+                                              .animateToPage(entry.key),
+                                          child: Container(
+                                            width: 12.0,
+                                            height: 12.0,
+                                            margin: const EdgeInsets.symmetric(
+                                                vertical: 6.0, horizontal: 4.0),
+                                            decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: (Theme.of(context)
+                                                                .brightness ==
+                                                            Brightness.dark
+                                                        ? Colors.white
+                                                        : Colors.black)
+                                                    .withOpacity(
+                                                        value == entry.key
+                                                            ? 0.9
+                                                            : 0.4)),
+                                          ),
+                                        );
+                                      }).toList(),
+                                    );
+                                  },
+                                ),
+                              ],
+                            );
+                          }
+                      }
+                    },
+                  ),
+                ),
                 Expanded(
                   child: FutureBuilder(
                     future: getMovies(),
@@ -229,16 +439,6 @@ class _MoreInfoState extends State<MoreInfo> {
   static const _bigFont = TextStyle(fontSize: 24.0);
   static const _mediumFont = TextStyle(fontSize: 18.5);
 
-  Widget urlToImgObj(url) {
-    if (url.startsWith("data:image")) {
-      return Image.memory(
-        base64Decode(url.split(",").last),
-      );
-    } else {
-      return Image.network(url);
-    }
-  }
-
   Widget getRating() {
     double? averageRating;
     if (widget.moviesInfo["ratings"].length > 1) {
@@ -267,43 +467,41 @@ class _MoreInfoState extends State<MoreInfo> {
     }
   }
 
+  Widget getImage() {
+    var imageProviderWidget = MoviesData().getImageProvider(widget.moviesInfo["poster"]);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20.0),
+      child: ImagePixels(
+        imageProvider: imageProviderWidget,
+        defaultColor: Colors.grey,
+        builder: (context, img) => SizedBox(
+          width: img.hasImage ? 250 : 0,
+          height: img.hasImage ? (250 / img.width!) * img.height! : 0,
+          child: Image(image: imageProviderWidget, fit: BoxFit.fill),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       drawer: GlobalVars().drawer(context, bigFont: _bigFont),
       appBar: AppBar(
+        actions: [
+          Container(
+            child: (ModalRoute.of(context)?.canPop ?? false)
+                ? const BackButton()
+                : null,
+          )
+        ],
         title: Text(widget.title),
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 20.0, left: 10.0, right: 10.0),
-            child: IntrinsicHeight(
-              child: Stack(
-                children: [
-                  Align(child: Text(widget.itemTitle, style: _bigFont)),
-                  Positioned(
-                    right: 0,
-                    child: GestureDetector(
-                        onTap: () async {
-                          Map<String, dynamic> response =
-                              await UserInfo().addItemToCart(widget.itemTitle);
-                          if (!response["success"]) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Text(response["message"]),
-                            ));
-                          } else {
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(const SnackBar(
-                              content: Text("Added to Cart!"),
-                            ));
-                          }
-                        },
-                        child: const Text("Add to Cart", style: _mediumFont)),
-                  )
-                ],
-              ),
-            ),
+            padding: const EdgeInsets.only(top: 15.0),
+            child: Center(child: Text(widget.itemTitle, style: _bigFont)),
           ),
           Expanded(
             child: Column(
@@ -317,7 +515,33 @@ class _MoreInfoState extends State<MoreInfo> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        urlToImgObj(widget.moviesInfo["preview_pic"]),
+                        GestureDetector(
+                          onTap: () async {
+                            Map<String, dynamic> response =
+                                await UserInfo().addItemToCart(widget.itemTitle);
+                            if (!response["success"]) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(response["message"]),
+                              ));
+                            } else {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(const SnackBar(
+                                content: Text("Added to Cart!"),
+                              ));
+                            }
+                          },
+                          child: Wrap(
+                            children: const [
+                              Text("Add to Cart", style: _mediumFont),
+                              Icon(
+                                Icons.add_shopping_cart_outlined,
+                                color: Colors.black,
+                              ),
+                            ],
+                          )
+                        ),
+                        const SizedBox(height: 10.0),
+                        getImage(),
                         Text(widget.moviesInfo["description"],
                             style: _mediumFont, textAlign: TextAlign.center),
                         getRating(),
@@ -400,11 +624,10 @@ class _ReviewsState extends State<Reviews> {
           ),
         );
         widgetReviews.add(
-          Center(child: Text(review["description"], style: _mediumFont)),
+          Center(child: Text(review["description"], textAlign: TextAlign.center, style: _mediumFont)),
         );
         if (index != widget.reviews.length - 1) {
-          widgetReviews.add(
-              const Divider(height: 70, thickness: 0, color: Colors.white));
+          widgetReviews.add(const SizedBox(height: 70));
         }
       });
     } else {
@@ -420,6 +643,13 @@ class _ReviewsState extends State<Reviews> {
     return Scaffold(
       drawer: GlobalVars().drawer(context, bigFont: _bigFont),
       appBar: AppBar(
+        actions: [
+          Container(
+            child: (ModalRoute.of(context)?.canPop ?? false)
+                ? const BackButton()
+                : null,
+          )
+        ],
         title: Text(widget.title),
       ),
       body: Padding(
@@ -511,6 +741,13 @@ class _AddReviewState extends State<AddReview> {
     return Scaffold(
       drawer: GlobalVars().drawer(context, bigFont: _bigFont),
       appBar: AppBar(
+        actions: [
+          Container(
+            child: (ModalRoute.of(context)?.canPop ?? false)
+                ? const BackButton()
+                : null,
+          )
+        ],
         title: Text(widget.title),
       ),
       body: Center(
@@ -599,9 +836,12 @@ class _CartState extends State<Cart> {
         widgets.add(Row(
           children: [
             Expanded(
-                flex: 3,
-                child:
-                    MoviesData().getImage(titleToIndex[item]!["preview_pic"])),
+              flex: 3,
+              child: MoviesData().getImage(
+                titleToIndex[item]!["poster"],
+                fullSize: false,
+              ),
+            ),
             const Spacer(flex: 1),
             Expanded(
               flex: 8,
@@ -662,6 +902,13 @@ class _CartState extends State<Cart> {
     return Scaffold(
       drawer: GlobalVars().drawer(context, bigFont: _bigFont),
       appBar: AppBar(
+        actions: [
+          Container(
+            child: (ModalRoute.of(context)?.canPop ?? false)
+                ? const BackButton()
+                : null,
+          )
+        ],
         title: Text(widget.title),
       ),
       body: Column(
@@ -796,6 +1043,13 @@ class _SignUpState extends State<SignUp> {
     return Scaffold(
       drawer: GlobalVars().drawer(context, bigFont: _bigFont),
       appBar: AppBar(
+        actions: [
+          Container(
+            child: (ModalRoute.of(context)?.canPop ?? false)
+                ? const BackButton()
+                : null,
+          )
+        ],
         title: Text(widget.title),
       ),
       body: Padding(
@@ -937,6 +1191,13 @@ class _LoginState extends State<Login> {
     return Scaffold(
       drawer: GlobalVars().drawer(context, bigFont: _bigFont),
       appBar: AppBar(
+        actions: [
+          Container(
+            child: (ModalRoute.of(context)?.canPop ?? false)
+                ? const BackButton()
+                : null,
+          )
+        ],
         title: Text(widget.title),
       ),
       body: Padding(
@@ -1026,9 +1287,12 @@ class _MyLibraryState extends State<MyLibrary> {
         widgets.add(Row(
           children: [
             Expanded(
-                flex: 3,
-                child:
-                    MoviesData().getImage(titleToIndex[item]!["preview_pic"])),
+              flex: 3,
+              child: MoviesData().getImage(
+                titleToIndex[item]!["poster"],
+                fullSize: true,
+              ),
+            ),
             const Spacer(flex: 1),
             Expanded(
               flex: 8,
@@ -1061,6 +1325,13 @@ class _MyLibraryState extends State<MyLibrary> {
     return Scaffold(
       drawer: GlobalVars().drawer(context, bigFont: _bigFont),
       appBar: AppBar(
+        actions: [
+          Container(
+            child: (ModalRoute.of(context)?.canPop ?? false)
+                ? const BackButton()
+                : null,
+          )
+        ],
         title: Text(widget.title),
       ),
       body: Center(
@@ -1149,6 +1420,13 @@ class _WatchMovieState extends State<WatchMovie> {
     return Scaffold(
       drawer: GlobalVars().drawer(context, bigFont: _bigFont),
       appBar: AppBar(
+        actions: [
+          Container(
+            child: (ModalRoute.of(context)?.canPop ?? false)
+                ? const BackButton()
+                : null,
+          )
+        ],
         title: Text(widget.title),
       ),
       body: Center(
@@ -1161,9 +1439,9 @@ class _WatchMovieState extends State<WatchMovie> {
 
   @override
   void dispose() {
-    super.dispose();
     _controller!.dispose();
     _chewieController!.dispose();
+    super.dispose();
   }
 }
 
