@@ -1,8 +1,9 @@
 import os
+import re
 import datetime
 
 from dotenv import load_dotenv
-from flask import *
+from flask import Flask, jsonify, request, Response, make_response
 from flask_pymongo import PyMongo
 from flask_cors import CORS
 from gridfs import GridFS
@@ -11,12 +12,12 @@ if "DYNO" not in os.environ:
     load_dotenv()
 
 app = Flask(__name__)
-app.config["MONGO_URI"] = f"mongodb+srv://{os.environ['user']}:{os.environ['password']}@full-stack-web-developm.m7o9n.mongodb.net/ecommerce_app?retryWrites=true&w=majority"
+app.config["MONGO_URI"] = os.environ["database_url"].replace("$user", os.environ["user"]).replace("$password", os.environ["password"])
 mongo = PyMongo(app)
 cors = CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 
-@app.route("/api/v1/get_movies")
+@app.route("/api/v1/get-movies")
 def get_movies():
     return jsonify([
         {key: value for key, value in movie.items() if key != "_id"}
@@ -24,7 +25,7 @@ def get_movies():
     ])
 
 
-@app.route("/api/v1/add_review", methods=["POST"])
+@app.route("/api/v1/add-review", methods=["POST"])
 def upload_movie():
     movie_title = request.json["movie_title"]
     movie_review = request.json["description"]
@@ -67,7 +68,16 @@ def login():
     return {"errorCode": 2, "success": False, "message": "Email or password is wrong"}
 
 
-@app.route("/api/v1/add_item_to_cart", methods=["POST"])
+@app.route("/api/v1/get-name", methods=["POST"])
+def get_name():
+    email = request.json["email"]
+    found = mongo.db.users.find_one({"email": email})
+    if found is not None:
+        return {"success": True, "firstname": found["firstname"], "lastname": found["lastname"]}
+    return {"errorCode": 9, "success": False, "message": "User with that email not found"}
+
+
+@app.route("/api/v1/add-item-to-cart", methods=["POST"])
 def add_item_to_cart():
     password = request.json["password"]
     email = request.json["email"]
@@ -86,7 +96,7 @@ def add_item_to_cart():
     return {"errorCode": 3, "success": False, "message": "User not found"}
 
 
-@app.route("/api/v1/get_cart_items", methods=["POST"])
+@app.route("/api/v1/get-cart-items", methods=["POST"])
 def get_cart_items():
     password = request.json["password"]
     email = request.json["email"]
@@ -97,7 +107,7 @@ def get_cart_items():
     return {"errorCode": 3, "success": False, "message": "User not found"}
 
 
-@app.route("/api/v1/remove_cart_item", methods=["POST"])
+@app.route("/api/v1/remove-cart-item", methods=["POST"])
 def remove_cart_item():
     password = request.json["password"]
     email = request.json["email"]
@@ -116,7 +126,7 @@ def remove_cart_item():
     return {"errorCode": 3, "success": False, "message": "User not found"}
 
 
-@app.route("/api/v1/add_item_to_library", methods=["POST"])
+@app.route("/api/v1/add-item-to-library", methods=["POST"])
 def add_item_to_library():
     password = request.json["password"]
     email = request.json["email"]
@@ -133,7 +143,7 @@ def add_item_to_library():
     return {"errorCode": 3, "success": False, "message": "User not found"}
 
 
-@app.route("/api/v1/get_library_items", methods=["POST"])
+@app.route("/api/v1/get-library-items", methods=["POST"])
 def get_library_items():
     password = request.json["password"]
     email = request.json["email"]
@@ -144,11 +154,17 @@ def get_library_items():
     return {"errorCode": 3, "success": False, "message": "User not found"}
 
 
-@app.route("/api/v1/stream_movie/<file_name>/", methods=["GET", "POST"])
-def serve_file(file_name):
+@app.route("/api/v1/get-featured-movies")
+def get_featured_movies():
+    return jsonify(mongo.db.ui_metadata.find({})[0]["featured_movies"])
+
+
+@app.route("/api/v1/stream-movie/<file_name>", methods=["GET", "POST"])
+def stream_movie(file_name):
     db = mongo.db
-    fs = GridFS(db)
-    f = fs.find_one({"name": file_name})
+    fs = GridFS(db, collection="movies")
+    regex = re.compile(file_name, re.IGNORECASE)
+    f = fs.find_one({"name": regex})
 
     if f is None:
         raise ValueError("File not found!")
@@ -156,6 +172,18 @@ def serve_file(file_name):
     response = make_response(f.read())
     response.mimetype = "video/mp4"
     return response
+
+
+@app.route("/api/v1/get-movie-poster/<file_name>", methods=["GET", "POST"])
+def get_movie_poster(file_name):
+    db = mongo.db
+    fs = GridFS(db, collection="movie_posters")
+    f = fs.find_one({"name": file_name})
+
+    if f is None:
+        raise ValueError("File not found!")
+
+    return Response(f, mimetype="image/jpg")
 
 
 if __name__ == "__main__":

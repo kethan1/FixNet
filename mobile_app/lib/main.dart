@@ -1,15 +1,19 @@
-import "package:flutter/material.dart";
-import "package:http/http.dart" as http;
-import "dart:convert";
-import "dart:math";
-import "package:flutter_rating_bar/flutter_rating_bar.dart";
-import "package:collection/collection.dart";
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:math';
+import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:collection/collection.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:image_pixels/image_pixels.dart';
 import 'package:intersperse/intersperse.dart';
-import "global.dart";
+import 'global.dart';
+
+const _bigFont = TextStyle(fontSize: 24.0);
+const _mediumFont = TextStyle(fontSize: 18.5);
+const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
 
 void main() {
   runApp(const MyApp());
@@ -21,16 +25,17 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: "FixNet",
+      title: 'FixNet',
       theme: ThemeData(
         primarySwatch: Colors.red,
       ),
-      home: const HomePage(title: "FixNet"),
+      home: const HomePage(title: 'FixNet'),
       routes: <String, WidgetBuilder>{
-        "/cart": (context) => const Cart(title: "FixNet"),
-        "/signup": (context) => const SignUp(title: "FixNet"),
-        "/login": (context) => const Login(title: "FixNet"),
-        "/library": (context) => const MyLibrary(title: "FixNet"),
+        '/cart': (context) => const Cart(title: 'FixNet'),
+        '/signup': (context) => const SignUp(title: 'FixNet'),
+        '/login': (context) => const Login(title: 'FixNet'),
+        '/library': (context) => const MyLibrary(title: 'FixNet'),
+        '/search': (context) => const Search(title: 'FixNet'),
       },
     );
   }
@@ -46,9 +51,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const _bigFont = TextStyle(fontSize: 24.0);
-  static const _mediumFont = TextStyle(fontSize: 18.5);
-  static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
   final CarouselController _controller = CarouselController();
 
   List<dynamic>? movies;
@@ -56,65 +58,56 @@ class _HomePageState extends State<HomePage> {
   final ValueNotifier<int> _current = ValueNotifier<int>(0);
 
   Future getMovies() async {
-    var url = Uri.parse("${GlobalVars().serverUrl}/api/v1/get_movies");
-    var response = await http.get(url).timeout(const Duration(seconds: 5));
-    if (response.statusCode == 200) {
-      movies = json.decode(response.body);
-      MoviesData().setMovies(movies!);
-    }
+    await MoviesData().getMovies();
+    movies = MoviesData().movies;
   }
 
   Future getFeaturedMovies() async {
-    await getMovies();
-    var url = Uri.parse("${GlobalVars().serverUrl}/api/v1/get_featured_movies");
-    var response = await http.get(url).timeout(const Duration(seconds: 5));
-    if (response.statusCode == 200) {
-      featuredMovies = json.decode(response.body);
-    }
+    await MoviesData().getFeaturedMovies();
+    featuredMovies = MoviesData().featuredMovies;
   }
 
   List<Widget> getFeaturedMovieWidgets() {
-    List<Widget> widgets = [];
+    if (MoviesData().featuredMovies == null) {
+      return [];
+    }
 
-    for (var movie in featuredMovies!) {
-      for (var map in movies!) {
-        if (map["title"] == movie) {
-          ImageProvider imageProviderWidget =
-              MoviesData().getImageProvider(map["poster"], fullSize: true);
-          widgets.add(GestureDetector(
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) {
-                return MoreInfo(
-                  title: "FixNet",
-                  itemTitle: map["title"],
-                  moviesInfo: map,
-                );
-              }));
-            },
-            child: Container(
-              margin: const EdgeInsets.all(5),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20.0),
-                child: ImagePixels(
-                  imageProvider: imageProviderWidget,
-                  defaultColor: Colors.grey,
-                  builder: (context, img) => SizedBox(
-                    width: img.hasImage ? 375 : 0,
-                    height: img.hasImage
-                        ? min((img.width! / 375) * img.height!, 180)
-                        : 0,
-                    child: Image(
-                      image: imageProviderWidget,
-                      fit: BoxFit.fill,
-                    ),
-                  ),
+    List<Widget> widgets = [];
+    for (var movie in MoviesData().featuredMovies!) {
+      var map = movies!.firstWhere((movieMap) => movie == movieMap['title']);
+      ImageProvider imageProviderWidget =
+          MoviesData().getImageProvider(map['poster'], fullSize: true);
+      widgets.add(GestureDetector(
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) {
+            return MoreInfo(
+              title: 'FixNet',
+              itemTitle: map['title'],
+              moviesInfo: map,
+            );
+          }));
+        },
+        child: Container(
+          margin: const EdgeInsets.all(5),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20.0),
+            child: ImagePixels(
+              imageProvider: imageProviderWidget,
+              defaultColor: Colors.grey,
+              builder: (context, img) => SizedBox(
+                width: img.hasImage ? 375 : 0,
+                height: img.hasImage
+                    ? min((img.width! / 375) * img.height!, 180)
+                    : 0,
+                child: Image(
+                  image: imageProviderWidget,
+                  fit: BoxFit.fill,
                 ),
               ),
             ),
-          ));
-          break;
-        }
-      }
+          ),
+        ),
+      ));
     }
 
     return widgets;
@@ -130,7 +123,7 @@ class _HomePageState extends State<HomePage> {
     moviesGroupedByGenre.forEach((genre, movies) {
       var moviesNotInFeatured = movies
           .where(
-              (movie) => !(featuredMovies?.contains(movie['title']) ?? false))
+              (movie) => !MoviesData().featuredMovies!.contains(movie['title']))
           .toList();
       if (moviesNotInFeatured.isEmpty) {
         return;
@@ -149,43 +142,43 @@ class _HomePageState extends State<HomePage> {
 
       List<Widget> genreMovies = [];
 
-      for (var movie in movies) {
+      for (var movie in moviesNotInFeatured) {
         ImageProvider imageProviderWidget =
-            MoviesData().getImageProvider(movie["poster"], fullSize: false);
-        if (!(featuredMovies?.contains(movie["title"]) ?? true)) {
-          genreMovies.add(GestureDetector(
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) {
-                return MoreInfo(
-                  title: "FixNet",
-                  itemTitle: movie["title"],
-                  moviesInfo: movie,
-                );
-              }));
-            },
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20.0),
-              child: ImagePixels(
-                imageProvider: imageProviderWidget,
-                defaultColor: Colors.grey,
-                builder: (context, img) => SizedBox(
-                  width: img.hasImage ? 185 : 0,
-                  height: img.hasImage ? (185 / img.width!) * img.height! : 0,
-                  child: Image(image: imageProviderWidget, fit: BoxFit.fill),
-                ),
+            MoviesData().getImageProvider(movie['poster'], fullSize: false);
+        genreMovies.add(GestureDetector(
+          onTap: () {
+            Navigator.push(context, MaterialPageRoute(builder: (context) {
+              return MoreInfo(
+                title: 'FixNet',
+                itemTitle: movie['title'],
+                moviesInfo: movie,
+              );
+            }));
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20.0),
+            child: ImagePixels(
+              imageProvider: imageProviderWidget,
+              defaultColor: Colors.grey,
+              builder: (context, img) => SizedBox(
+                width: img.hasImage ? 185 : 0,
+                height: img.hasImage ? (185 / img.width!) * img.height! : 0,
+                child: Image(image: imageProviderWidget, fit: BoxFit.fill),
               ),
             ),
-          ));
-        }
+          ),
+        ));
       }
 
       widgets.add(SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: Row(children: [
-          const SizedBox(width: 10),
-          ...genreMovies.intersperse(const SizedBox(width: 30)).toList(),
-          const SizedBox(width: 10)
-        ]),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children:
+                genreMovies.intersperse(const SizedBox(width: 30)).toList(),
+          ),
+        ),
       ));
 
       widgets.add(const Divider(
@@ -225,12 +218,12 @@ class _HomePageState extends State<HomePage> {
                   child: Column(
                     children: const [
                       Text(
-                        "Movies at a One Time Cost, Forever Accessible",
+                        'Movies at a One Time Cost, Forever Accessible',
                         textAlign: TextAlign.center,
                         style: _bigFont,
                       ),
                       Text(
-                        "No More Pesky Subscriptions",
+                        'No More Pesky Subscriptions',
                         style: _mediumFont,
                       ),
                     ],
@@ -255,7 +248,7 @@ class _HomePageState extends State<HomePage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: const [
-                              Text("Connecting...",
+                              Text('Connecting...',
                                   style: _mediumButBiggerFont),
                             ],
                           );
@@ -264,7 +257,7 @@ class _HomePageState extends State<HomePage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: const [
-                              Text("Loading...", style: _mediumButBiggerFont),
+                              Text('Loading...', style: _mediumButBiggerFont),
                             ],
                           );
                         default:
@@ -275,15 +268,16 @@ class _HomePageState extends State<HomePage> {
                               children: [
                                 GestureDetector(
                                   onTap: () {
-                                    getMovies();
-                                    setState(() {});
+                                    setState(() {
+                                      getMovies();
+                                    });
                                   },
                                   child: Wrap(
                                     crossAxisAlignment:
                                         WrapCrossAlignment.center,
                                     children: const [
                                       Icon(Icons.refresh_rounded),
-                                      Text("Network Error",
+                                      Text('Network Error',
                                           style: _mediumButBiggerFont),
                                     ],
                                   ),
@@ -362,44 +356,33 @@ class _HomePageState extends State<HomePage> {
                     builder: (BuildContext context, AsyncSnapshot snapshot) {
                       switch (snapshot.connectionState) {
                         case ConnectionState.none:
-                          return Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: const [
-                              Text("Connecting...",
-                                  style: _mediumButBiggerFont),
-                            ],
+                          return const Center(
+                            child: Text('Connecting...',
+                                style: _mediumButBiggerFont),
                           );
                         case ConnectionState.waiting:
-                          return Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: const [
-                              Text("Loading...", style: _mediumButBiggerFont),
-                            ],
+                          return const Center(
+                            child:
+                                Text('Loading...', style: _mediumButBiggerFont),
                           );
                         default:
                           if (snapshot.hasError) {
-                            return Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                GestureDetector(
-                                  onTap: () {
+                            return Center(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
                                     getMovies();
-                                    setState(() {});
-                                  },
-                                  child: Wrap(
-                                    crossAxisAlignment:
-                                        WrapCrossAlignment.center,
-                                    children: const [
-                                      Icon(Icons.refresh_rounded),
-                                      Text("Network Error",
-                                          style: _mediumButBiggerFont),
-                                    ],
-                                  ),
-                                )
-                              ],
+                                  });
+                                },
+                                child: Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: const [
+                                    Icon(Icons.refresh_rounded),
+                                    Text('Network Error',
+                                        style: _mediumButBiggerFont),
+                                  ],
+                                ),
+                              ),
                             );
                           } else {
                             return ListView(
@@ -436,23 +419,20 @@ class MoreInfo extends StatefulWidget {
 }
 
 class _MoreInfoState extends State<MoreInfo> {
-  static const _bigFont = TextStyle(fontSize: 24.0);
-  static const _mediumFont = TextStyle(fontSize: 18.5);
-
   Widget getRating() {
     double? averageRating;
-    if (widget.moviesInfo["ratings"].length > 1) {
-      averageRating = widget.moviesInfo["ratings"]
-              .map((e) => e["stars"])
+    if (widget.moviesInfo['ratings'].length > 1) {
+      averageRating = widget.moviesInfo['ratings']
+              .map((e) => e['stars'])
               .toList()
               .fold(0, (a, b) => a + b) /
-          widget.moviesInfo["ratings"].length;
-    } else if (widget.moviesInfo["ratings"].length == 1) {
-      averageRating = widget.moviesInfo["ratings"][0]["stars"];
+          widget.moviesInfo['ratings'].length;
+    } else if (widget.moviesInfo['ratings'].length == 1) {
+      averageRating = widget.moviesInfo['ratings'][0]['stars'];
     }
 
     if (averageRating == null) {
-      return const Text("No Ratings Yet!", style: _mediumFont);
+      return const Text('No Ratings Yet!', style: _mediumFont);
     } else {
       return RatingBarIndicator(
         rating: averageRating,
@@ -468,7 +448,8 @@ class _MoreInfoState extends State<MoreInfo> {
   }
 
   Widget getImage() {
-    var imageProviderWidget = MoviesData().getImageProvider(widget.moviesInfo["poster"]);
+    var imageProviderWidget =
+        MoviesData().getImageProvider(widget.moviesInfo['poster']);
     return ClipRRect(
       borderRadius: BorderRadius.circular(20.0),
       child: ImagePixels(
@@ -516,33 +497,33 @@ class _MoreInfoState extends State<MoreInfo> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         GestureDetector(
-                          onTap: () async {
-                            Map<String, dynamic> response =
-                                await UserInfo().addItemToCart(widget.itemTitle);
-                            if (!response["success"]) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: Text(response["message"]),
-                              ));
-                            } else {
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(const SnackBar(
-                                content: Text("Added to Cart!"),
-                              ));
-                            }
-                          },
-                          child: Wrap(
-                            children: const [
-                              Text("Add to Cart", style: _mediumFont),
-                              Icon(
-                                Icons.add_shopping_cart_outlined,
-                                color: Colors.black,
-                              ),
-                            ],
-                          )
-                        ),
+                            onTap: () async {
+                              Map<String, dynamic> response = await UserInfo()
+                                  .addItemToCart(widget.itemTitle);
+                              if (!response['success']) {
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(SnackBar(
+                                  content: Text(response['message']),
+                                ));
+                              } else {
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(const SnackBar(
+                                  content: Text('Added to Cart!'),
+                                ));
+                              }
+                            },
+                            child: Wrap(
+                              children: const [
+                                Text('Add to Cart', style: _mediumFont),
+                                Icon(
+                                  Icons.add_shopping_cart_outlined,
+                                  color: Colors.black,
+                                ),
+                              ],
+                            )),
                         const SizedBox(height: 10.0),
                         getImage(),
-                        Text(widget.moviesInfo["description"],
+                        Text(widget.moviesInfo['description'],
                             style: _mediumFont, textAlign: TextAlign.center),
                         getRating(),
                       ],
@@ -568,13 +549,13 @@ class _MoreInfoState extends State<MoreInfo> {
                         Navigator.push(context,
                             MaterialPageRoute(builder: (context) {
                           return Reviews(
-                            title: "FixNet",
-                            reviews: widget.moviesInfo["ratings"],
+                            title: 'FixNet',
+                            reviews: widget.moviesInfo['ratings'],
                             itemTitle: widget.itemTitle,
                           );
                         }));
                       },
-                      child: const Text("See Reviews", style: _mediumFont),
+                      child: const Text('See Reviews', style: _mediumFont),
                     )
                   ],
                 ),
@@ -604,9 +585,6 @@ class Reviews extends StatefulWidget {
 }
 
 class _ReviewsState extends State<Reviews> {
-  static const _bigFont = TextStyle(fontSize: 24.0);
-  static const _mediumFont = TextStyle(fontSize: 18.5);
-
   List<Widget> getReviews() {
     List<Widget> widgetReviews = [];
     if (widget.reviews.isNotEmpty) {
@@ -614,7 +592,7 @@ class _ReviewsState extends State<Reviews> {
         widgetReviews.add(
           Center(
             child: RatingBarIndicator(
-              rating: review["stars"].toDouble(),
+              rating: review['stars'].toDouble(),
               itemPadding: const EdgeInsets.symmetric(horizontal: 2.0),
               itemBuilder: (context, _) => const Icon(
                 Icons.star,
@@ -624,7 +602,9 @@ class _ReviewsState extends State<Reviews> {
           ),
         );
         widgetReviews.add(
-          Center(child: Text(review["description"], textAlign: TextAlign.center, style: _mediumFont)),
+          Center(
+              child: Text(review['description'],
+                  textAlign: TextAlign.center, style: _mediumFont)),
         );
         if (index != widget.reviews.length - 1) {
           widgetReviews.add(const SizedBox(height: 70));
@@ -632,7 +612,7 @@ class _ReviewsState extends State<Reviews> {
       });
     } else {
       widgetReviews.add(
-        const Center(child: Text("No Reviews Yet!", style: _mediumFont)),
+        const Center(child: Text('No Reviews Yet!', style: _mediumFont)),
       );
     }
     return widgetReviews;
@@ -660,15 +640,16 @@ class _ReviewsState extends State<Reviews> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                  child: Center(
-                child: ListView(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.all(20.0),
-                  children: [
-                    ...getReviews(),
-                  ],
+                child: Center(
+                  child: ListView(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.all(20.0),
+                    children: [
+                      ...getReviews(),
+                    ],
+                  ),
                 ),
-              )),
+              ),
               Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -677,12 +658,12 @@ class _ReviewsState extends State<Reviews> {
                         Navigator.push(context,
                             MaterialPageRoute(builder: (context) {
                           return AddReview(
-                            title: "FixNet",
+                            title: 'FixNet',
                             itemTitle: widget.itemTitle,
                           );
                         }));
                       },
-                      child: const Text("Add Review", style: _mediumFont)),
+                      child: const Text('Add Review', style: _mediumFont)),
                 ],
               ),
             ],
@@ -705,32 +686,42 @@ class AddReview extends StatefulWidget {
 }
 
 class _AddReviewState extends State<AddReview> {
-  final myController = TextEditingController();
-  static const _bigFont = TextStyle(fontSize: 24.0);
-  static const _mediumFont = TextStyle(fontSize: 18.5);
+  final reviewController = TextEditingController();
 
   double rating = 0;
+  Color buttonColor = Colors.blue;
 
   @override
   void dispose() {
-    myController.dispose();
+    reviewController.dispose();
     super.dispose();
   }
 
-  void postReview() {
+  Future<void> postReview() async {
+    var name = await UserInfo().getName();
     if (rating == 0) {
-      throw const UserForgot("select a rating");
+      throw const UserForgot('select a rating');
+    } else if (reviewController.text.isEmpty) {
+      throw const UserForgot('enter a review');
+    } else if (reviewController.text.length < 10) {
+      throw const UserForgot('review too short');
+    } else if (reviewController.text.length > 100) {
+      throw const UserForgot('review too long');
+    } else if (!name['success']) {
+      throw UserForgot(name['message']);
     }
-    var url = Uri.parse("${GlobalVars().serverUrl}/api/v1/add_review");
+
+    var url = Uri.parse('${GlobalVars().serverUrl}/api/v1/add-review');
     var body = json.encode({
-      "description": myController.text,
-      "stars": rating,
-      "movie_title": widget.itemTitle
+      'description':
+          '${reviewController.text} - ${name['firstname']} ${name['lastname']}',
+      'stars': rating,
+      'movie_title': widget.itemTitle
     });
 
     Map<String, String> headers = {
-      "Content-type": "application/json",
-      "Accept": "application/json",
+      'Content-type': 'application/json',
+      'Accept': 'application/json',
     };
 
     http.post(url, body: body, headers: headers);
@@ -750,47 +741,98 @@ class _AddReviewState extends State<AddReview> {
         ],
         title: Text(widget.title),
       ),
-      body: Center(
-        child: Column(children: [
-          RatingBar.builder(
-            minRating: 1,
-            direction: Axis.horizontal,
-            allowHalfRating: true,
-            itemCount: 5,
-            itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
-            itemBuilder: (context, _) => const Icon(
-              Icons.star,
-              color: Colors.amber,
+      body: Container(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            RatingBar.builder(
+              minRating: 1,
+              direction: Axis.horizontal,
+              allowHalfRating: true,
+              itemCount: 5,
+              itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
+              itemBuilder: (context, _) => const Icon(
+                Icons.star,
+                color: Colors.amber,
+              ),
+              onRatingUpdate: (rating) {
+                this.rating = rating;
+              },
             ),
-            onRatingUpdate: (rating) {
-              this.rating = rating;
-            },
-          ),
-          TextField(
-            controller: myController,
-            maxLength: 100,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              hintText: "Enter your review here in 100 characters or less",
+            TextField(
+              controller: reviewController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Enter your review here in 100 characters or less',
+              ),
             ),
-          ),
-          TextButton(
-            style: ButtonStyle(
-              foregroundColor: MaterialStateProperty.all<Color>(Colors.blue),
-            ),
-            onPressed: () {
-              try {} on UserForgot catch (e) {
-                if (e.msg == "select a rating") {
+            TextButton(
+              style: ButtonStyle(
+                foregroundColor: MaterialStateProperty.resolveWith(
+                  (states) {
+                    const Set<MaterialState> interactiveStates =
+                        <MaterialState>{
+                      MaterialState.pressed,
+                      MaterialState.hovered,
+                      MaterialState.focused,
+                    };
+                    if (states.any(interactiveStates.contains)) {
+                      return Colors.blue[300];
+                    }
+                    return Colors.blue;
+                  },
+                ),
+              ),
+              onPressed: () async {
+                try {
+                  await postReview();
+                  Navigator.pushNamed(context, '/');
+
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text("Please Select a Rating"),
+                    content: Text('Sucessfully Posted Review'),
                   ));
+                } on UserForgot catch (e) {
+                  if (e.msg == 'select a rating') {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Please Select a Rating'),
+                    ));
+                  } else if (e.msg == 'enter a review') {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Please Enter a Review'),
+                    ));
+                  } else if (e.msg == 'review too short') {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Please Enter a Longer Review'),
+                    ));
+                  } else if (e.msg == 'review too long') {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Please Enter a Shorter Review'),
+                    ));
+                  } else if (e.msg == 'Not logged in') {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text(
+                          'Please Login or Sign Up Before Posting a Review'),
+                    ));
+                  } else if (e.msg == 'Server timed out') {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Server Timed Out. Try Again'),
+                    ));
+                  } else if (e.msg == 'User Not Found') {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('User Not Found'),
+                    ));
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('An Error Occurred'),
+                    ));
+                  }
                 }
-              }
-              postReview();
-            },
-            child: const Text("Publish Your Review", style: _mediumFont),
-          )
-        ]),
+              },
+              child: const Text('Publish Your Review', style: _mediumFont),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -807,18 +849,15 @@ class Cart extends StatefulWidget {
 
 class _CartState extends State<Cart> {
   List<String>? itemsInCart;
-  static const _bigFont = TextStyle(fontSize: 24.0);
-  static const _mediumFont = TextStyle(fontSize: 18.5);
-  static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
 
   Future<void> getItems() async {
     Map<String, dynamic> cartItems = await UserInfo().getCartItems();
-    if (cartItems["success"]) {
-      itemsInCart = cartItems["items"];
+    if (cartItems['success']) {
+      itemsInCart = cartItems['items'];
     } else {
-      if (cartItems["message"]! == "Server timed out") {
+      if (cartItems['message']! == 'Server timed out') {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text("Server Timed Out"),
+          content: Text('Server Timed Out'),
         ));
       }
     }
@@ -828,7 +867,7 @@ class _CartState extends State<Cart> {
     List<Widget> widgets = [];
     Map<String, Map<dynamic, dynamic>> titleToIndex = {};
     for (var map in MoviesData().movies!) {
-      titleToIndex[map["title"]] = map;
+      titleToIndex[map['title']] = map;
     }
     if (itemsInCart != null && itemsInCart!.isNotEmpty) {
       List<double> prices = [];
@@ -838,7 +877,7 @@ class _CartState extends State<Cart> {
             Expanded(
               flex: 3,
               child: MoviesData().getImage(
-                titleToIndex[item]!["poster"],
+                titleToIndex[item]!['poster'],
                 fullSize: false,
               ),
             ),
@@ -849,7 +888,7 @@ class _CartState extends State<Cart> {
             ),
             Expanded(
               flex: 4,
-              child: Text("\$${titleToIndex[item]!['cost']}", style: _bigFont),
+              child: Text('\$${titleToIndex[item]!['cost']}', style: _bigFont),
             ),
           ],
         ));
@@ -863,11 +902,11 @@ class _CartState extends State<Cart> {
       widgets.add(Row(children: [
         const Expanded(
           flex: 3,
-          child: Text("Total Cost", style: _bigFont),
+          child: Text('Total Cost', style: _bigFont),
         ),
         Expanded(
           flex: 1,
-          child: Text("\$$totalPrice", style: _bigFont),
+          child: Text('\$$totalPrice', style: _bigFont),
         ),
         const Divider(
           height: 40,
@@ -882,7 +921,7 @@ class _CartState extends State<Cart> {
               await UserInfo().removeItemFromCart(item);
               await UserInfo().addItemToLibrary(item);
             }
-            Navigator.pushNamed(context, "/");
+            Navigator.pushNamed(context, '/');
           },
           child: const Text(
             'Checkout',
@@ -892,7 +931,7 @@ class _CartState extends State<Cart> {
       ));
     } else {
       widgets
-          .add(const Center(child: Text("No Items in Cart", style: _bigFont)));
+          .add(const Center(child: Text('No Items in Cart', style: _bigFont)));
     }
     return widgets;
   }
@@ -926,7 +965,7 @@ class _CartState extends State<Cart> {
                     children: const [
                       Center(
                           child:
-                              Text("Loading...", style: _mediumButBiggerFont)),
+                              Text('Loading...', style: _mediumButBiggerFont)),
                     ],
                   );
                 case ConnectionState.waiting:
@@ -936,7 +975,7 @@ class _CartState extends State<Cart> {
                     children: const [
                       Center(
                           child:
-                              Text("Loading...", style: _mediumButBiggerFont)),
+                              Text('Loading...', style: _mediumButBiggerFont)),
                     ],
                   );
                 default:
@@ -953,7 +992,7 @@ class _CartState extends State<Cart> {
                           child: Wrap(
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: const [
-                              Text("Unable to load cart. Tap to retry.",
+                              Text('Unable to load cart. Tap to retry.',
                                   style: _mediumButBiggerFont),
                               Icon(Icons.refresh_rounded),
                             ],
@@ -994,8 +1033,6 @@ class _SignUpState extends State<SignUp> {
   final email = TextEditingController();
   final password = TextEditingController();
   final confirmPassword = TextEditingController();
-  static const _bigFont = TextStyle(fontSize: 24.0);
-  static const _mediumFont = TextStyle(fontSize: 18.5);
 
   @override
   void dispose() {
@@ -1013,25 +1050,25 @@ class _SignUpState extends State<SignUp> {
         password.text.isEmpty ||
         confirmPassword.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text("Please fill in all fields"),
+        content: Text('Please fill in all fields'),
       ));
     } else if (password.text != confirmPassword.text) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text("Confirm Password Does Not Match Password"),
+        content: Text('Confirm Password Does Not Match Password'),
       ));
     } else {
       Map<String, dynamic> signupResponse = await UserInfo()
           .signup(firstName.text, lastName.text, email.text, password.text);
-      if (signupResponse["success"]!) {
-        Navigator.pushNamed(context, "/");
+      if (signupResponse['success']!) {
+        Navigator.pushNamed(context, '/');
       } else {
-        if (signupResponse["message"]! == "User Already Exists") {
+        if (signupResponse['message']! == 'User Already Exists') {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text("Account with That Email Already Exists"),
+            content: Text('Account with That Email Already Exists'),
           ));
         } else {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text("Could Not Connect to the Server"),
+            content: Text('Could Not Connect to the Server'),
           ));
         }
       }
@@ -1056,7 +1093,7 @@ class _SignUpState extends State<SignUp> {
         padding: const EdgeInsets.only(left: 12.0, right: 12.0, top: 25.0),
         child: Column(
           children: [
-            const Text("Signup", style: _bigFont),
+            const Text('Signup', style: _bigFont),
             const Spacer(flex: 23),
             TextField(
               controller: firstName,
@@ -1152,8 +1189,6 @@ class Login extends StatefulWidget {
 class _LoginState extends State<Login> {
   final email = TextEditingController();
   final password = TextEditingController();
-  static const _bigFont = TextStyle(fontSize: 24.0);
-  static const _mediumFont = TextStyle(fontSize: 18.5);
 
   @override
   void dispose() {
@@ -1165,21 +1200,21 @@ class _LoginState extends State<Login> {
   void login() async {
     if (email.text.isEmpty || password.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text("Please fill in all fields"),
+        content: Text('Please fill in all fields'),
       ));
     } else {
       Map<String, dynamic> loginResponse =
           await UserInfo().login(email.text, password.text);
-      if (loginResponse["success"]!) {
-        Navigator.pushNamed(context, "/");
+      if (loginResponse['success']!) {
+        Navigator.pushNamed(context, '/');
       } else {
-        if (loginResponse["message"]!.toString() == "Invalid credentials") {
+        if (loginResponse['message']!.toString() == 'Invalid credentials') {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text("Invalid Email or Password"),
+            content: Text('Invalid Email or Password'),
           ));
         } else {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text("Could Not Connect to the Server"),
+            content: Text('Could Not Connect to the Server'),
           ));
         }
       }
@@ -1206,7 +1241,7 @@ class _LoginState extends State<Login> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Text("Login", style: _bigFont),
+            const Text('Login', style: _bigFont),
             const Spacer(flex: 55),
             TextField(
               controller: email,
@@ -1260,18 +1295,15 @@ class MyLibrary extends StatefulWidget {
 
 class _MyLibraryState extends State<MyLibrary> {
   List<String> myLibrary = [];
-  static const _bigFont = TextStyle(fontSize: 24.0);
-  static const _mediumFont = TextStyle(fontSize: 18.5);
-  static const _mediumButBiggerFont = TextStyle(fontSize: 21.0);
 
   Future<void> getLibrary() async {
     Map<String, dynamic> libraryItemsResponse =
         await UserInfo().getLibraryItems();
-    if (libraryItemsResponse["success"]) {
-      myLibrary = libraryItemsResponse["items"];
+    if (libraryItemsResponse['success']) {
+      myLibrary = libraryItemsResponse['items'];
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text("Could Not Connect to the Server", style: _mediumFont),
+        content: Text('Could Not Connect to the Server', style: _mediumFont),
       ));
     }
   }
@@ -1280,7 +1312,7 @@ class _MyLibraryState extends State<MyLibrary> {
     List<Widget> widgets = [];
     Map<String, Map<dynamic, dynamic>> titleToIndex = {};
     for (var map in MoviesData().movies!) {
-      titleToIndex[map["title"]] = map;
+      titleToIndex[map['title']] = map;
     }
     if (myLibrary.isNotEmpty) {
       for (String item in myLibrary) {
@@ -1289,7 +1321,7 @@ class _MyLibraryState extends State<MyLibrary> {
             Expanded(
               flex: 3,
               child: MoviesData().getImage(
-                titleToIndex[item]!["poster"],
+                titleToIndex[item]!['poster'],
                 fullSize: true,
               ),
             ),
@@ -1300,22 +1332,25 @@ class _MyLibraryState extends State<MyLibrary> {
             ),
             const Spacer(flex: 1),
             TextButton(
-                onPressed: () {
-                  // redirect to movie page
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            WatchMovie(title: widget.title, movieTitle: item),
-                      ));
-                },
-                child: const Text("Watch", style: _mediumFont)),
+              onPressed: () {
+                // redirect to movie page
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        WatchMovie(title: widget.title, movieTitle: item),
+                  ),
+                );
+              },
+              child: const Text('Watch', style: _mediumFont),
+            ),
           ],
         ));
       }
     } else {
       widgets.add(
-          const Center(child: Text("No Items in Library", style: _bigFont)));
+        const Center(child: Text('No Items in Library', style: _bigFont)),
+      );
     }
     return widgets;
   }
@@ -1345,7 +1380,7 @@ class _MyLibraryState extends State<MyLibrary> {
                 builder: (context, snapshot) {
                   switch (snapshot.connectionState) {
                     case ConnectionState.none:
-                      return const Text("No Connection", style: _mediumFont);
+                      return const Text('No Connection', style: _mediumFont);
                     case ConnectionState.waiting:
                       return const Center(child: CircularProgressIndicator());
                     case ConnectionState.active:
@@ -1360,7 +1395,7 @@ class _MyLibraryState extends State<MyLibrary> {
                           child: Wrap(
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: const [
-                              Text("Unable to load movies. Tap to retry.",
+                              Text('Unable to load movies. Tap to retry.',
                                   style: _mediumButBiggerFont),
                               Icon(Icons.refresh_rounded),
                             ],
@@ -1399,19 +1434,19 @@ class _WatchMovieState extends State<WatchMovie> {
   VideoPlayerController? _controller;
   ChewieController? _chewieController;
   bool controllerInitialized = false;
-  static const _bigFont = TextStyle(fontSize: 24.0);
-  static const _mediumFont = TextStyle(fontSize: 18.5);
 
   @override
   void initState() {
     super.initState();
     _controller = VideoPlayerController.network(GlobalVars().serverUrl +
-        "/api/v1/stream_movie/" +
-        widget.movieTitle.toLowerCase().replaceAll(" ", ""));
-    _controller?.initialize().then((_) {
-      _chewieController = ChewieController(videoPlayerController: _controller!);
-      controllerInitialized = true;
-      setState(() {});
+        '/api/v1/stream-movie/' +
+        widget.movieTitle.toLowerCase().replaceAll(' ', '_'));
+    _controller!.initialize().then((_) {
+      setState(() {
+        _chewieController =
+            ChewieController(videoPlayerController: _controller!);
+        controllerInitialized = true;
+      });
     });
   }
 
@@ -1439,10 +1474,152 @@ class _WatchMovieState extends State<WatchMovie> {
 
   @override
   void dispose() {
+    print(_chewieController);
     _controller!.dispose();
     _chewieController!.dispose();
     super.dispose();
   }
+}
+
+class Search extends StatefulWidget {
+  const Search({Key? key, required this.title}) : super(key: key);
+
+  final String title;
+
+  @override
+  _SearchState createState() => _SearchState();
+}
+
+class _SearchState extends State<Search> {
+  final ValueNotifier<List<dynamic>> moviesFound = ValueNotifier([]);
+
+  void search(String searchTerm) {
+    moviesFound.value = MoviesData()
+        .movies!
+        .where((item) =>
+            item['title'].toLowerCase().contains(searchTerm) &&
+            searchTerm.isNotEmpty)
+        .toList();
+  }
+
+  List<Widget> getSearchWidgets() {
+    List<Widget> widgets = [];
+    for (var movie in moviesFound.value) {
+      ImageProvider imageProviderWidget =
+          MoviesData().getImageProvider(movie['poster'], fullSize: false);
+      widgets.add(GestureDetector(
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) {
+            return MoreInfo(
+              title: 'FixNet',
+              itemTitle: movie['title'],
+              moviesInfo: movie,
+            );
+          }));
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20.0),
+          child: Image(image: imageProviderWidget),
+        ),
+      ));
+    }
+    return widgets;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      drawer: GlobalVars().drawer(context, bigFont: _bigFont),
+      appBar: AppBar(
+        actions: [
+          Container(
+            child: (ModalRoute.of(context)?.canPop ?? false)
+                ? const BackButton()
+                : null,
+          )
+        ],
+        title: Text(widget.title),
+      ),
+      body: Container(
+        padding: const EdgeInsets.only(left: 10, right: 10, top: 35),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SearchWidget(onChange: search),
+            const SizedBox(height: 20),
+            ValueListenableBuilder<List<dynamic>>(
+              valueListenable: moviesFound,
+              builder: (context, value, widget) {
+                if (value.isEmpty) {
+                  return const Text('No Movies Found', style: _mediumFont);
+                } else {
+                  return Expanded(
+                    child: GridView.count(
+                      childAspectRatio: MediaQuery.of(context).size.width /
+                          (MediaQuery.of(context).size.height / 1.45),
+                      mainAxisSpacing: 5,
+                      shrinkWrap: true,
+                      crossAxisCount: 2,
+                      children: getSearchWidgets(),
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SearchWidget extends StatefulWidget {
+  const SearchWidget({Key? key, this.onChange = onChangePlaceholder})
+      : super(key: key);
+
+  final void Function(String) onChange;
+  static onChangePlaceholder(String _) {}
+
+  @override
+  _SearchWidgetState createState() => _SearchWidgetState();
+}
+
+class _SearchWidgetState extends State<SearchWidget> {
+  final FocusNode _focus = FocusNode();
+
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      onChanged: widget.onChange,
+      controller: _controller,
+      focusNode: _focus,
+      decoration: InputDecoration(
+        labelText: 'Search',
+        border: const OutlineInputBorder(),
+        enabledBorder: const OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.grey, width: 1.0),
+        ),
+        prefixIcon: const Icon(
+          Icons.search,
+          color: Colors.grey,
+        ),
+        suffixIcon: GestureDetector(
+          onTap: () {
+            _controller.clear();
+            _focus.unfocus();
+          },
+          child: const Icon(
+            Icons.close,
+            color: Colors.grey,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String getValue() => _controller.text;
 }
 
 class UserForgot implements Exception {
@@ -1450,5 +1627,5 @@ class UserForgot implements Exception {
   const UserForgot(this.msg);
 
   @override
-  String toString() => "UserForgot: $msg";
+  String toString() => 'UserForgot: $msg';
 }

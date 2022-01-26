@@ -1,16 +1,15 @@
-import "dart:async";
-
-import "package:flutter/foundation.dart" show kIsWeb;
-import "package:shared_preferences/shared_preferences.dart";
-import "package:flutter/material.dart";
-import "package:http/http.dart" as http;
-import "dart:convert";
+import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class GlobalVars {
   bool debug = true;
   late String serverUrl = debug
-      ? (kIsWeb ? "http://localhost:5000" : "http://10.0.2.2:5000")
-      : "https://fixnet.herokuapp.com";
+      ? (kIsWeb ? 'http://localhost:5000' : 'http://10.0.2.2:5000')
+      : 'https://fixnet.herokuapp.com';
 
   static final GlobalVars _singleton = GlobalVars._internal();
 
@@ -28,80 +27,92 @@ class GlobalVars {
             decoration: BoxDecoration(
               color: Colors.red,
             ),
-            child: Text(""),
+            child: Text(''),
           ),
           ListTile(
             title: Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 const Icon(Icons.home),
-                Text(" Home", style: bigFont),
+                Text(' Home', style: bigFont),
               ],
             ),
             onTap: () {
-              Navigator.pushNamed(context, "/");
+              Navigator.pushNamed(context, '/');
             },
           ),
-          if (UserInfo().signedIn)
+          ListTile(
+            title: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Icon(Icons.search),
+                Text(' Search', style: bigFont),
+              ],
+            ),
+            onTap: () {
+              Navigator.pushNamed(context, '/search');
+            },
+          ),
+          if (UserInfo().loggedIn)
             ListTile(
               title: Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   const Icon(Icons.shopping_cart),
-                  Text(" Cart", style: bigFont),
+                  Text(' Cart', style: bigFont),
                 ],
               ),
-              onTap: () => Navigator.pushNamed(context, "/cart"),
+              onTap: () => Navigator.pushNamed(context, '/cart'),
             ),
-          if (UserInfo().signedIn)
+          if (UserInfo().loggedIn)
             ListTile(
               title: Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   const Icon(Icons.video_library),
-                  Text(" Library", style: bigFont),
+                  Text(' Library', style: bigFont),
                 ],
               ),
-              onTap: () => Navigator.pushNamed(context, "/library"),
+              onTap: () => Navigator.pushNamed(context, '/library'),
             ),
-          if (!UserInfo().initialized || !UserInfo().signedIn)
+          if (!UserInfo().initialized || !UserInfo().loggedIn)
             ListTile(
               title: Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   const Icon(Icons.login_outlined, size: 25.0),
-                  Text(" Sign Up", style: bigFont),
+                  Text(' Sign Up', style: bigFont),
                 ],
               ),
               onTap: () {
-                Navigator.pushNamed(context, "/signup");
+                Navigator.pushNamed(context, '/signup');
               },
             ),
-          if (!UserInfo().initialized || !UserInfo().signedIn)
+          if (!UserInfo().initialized || !UserInfo().loggedIn)
             ListTile(
               title: Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   const Icon(Icons.login_outlined, size: 25.0),
-                  Text(" Login", style: bigFont),
+                  Text(' Login', style: bigFont),
                 ],
               ),
               onTap: () {
-                Navigator.pushNamed(context, "/login");
+                Navigator.pushNamed(context, '/login');
               },
             ),
-          if (UserInfo().signedIn)
+          if (UserInfo().loggedIn)
             ListTile(
               title: Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   const Icon(Icons.logout_outlined, size: 25.0),
-                  Text(" Logout", style: bigFont),
+                  Text(' Logout', style: bigFont),
                 ],
               ),
               onTap: () {
                 UserInfo().logout();
-                Navigator.pushNamed(context, "/");
+                Navigator.pushNamed(context, '/');
               },
             ),
         ],
@@ -114,6 +125,7 @@ class GlobalVars {
 
 class MoviesData {
   List<dynamic>? movies;
+  List<dynamic>? featuredMovies;
 
   static final MoviesData _singleton = MoviesData._internal();
 
@@ -121,19 +133,37 @@ class MoviesData {
     return _singleton;
   }
 
-  setMovies(List<dynamic> movies) {
-    this.movies = movies;
+  Future getMovies() async {
+    var url = Uri.parse('${GlobalVars().serverUrl}/api/v1/get-movies');
+    var response = await http.get(url).timeout(const Duration(seconds: 5));
+    if (response.statusCode == 200) {
+      movies = json.decode(response.body);
+    }
+    if (featuredMovies == null) {
+      await getFeaturedMovies();
+    }
+  }
+
+  Future getFeaturedMovies() async {
+    if (movies == null) {
+      await getMovies();
+    }
+    var url = Uri.parse('${GlobalVars().serverUrl}/api/v1/get-featured-movies');
+    var response = await http.get(url).timeout(const Duration(seconds: 5));
+    if (response.statusCode == 200) {
+      featuredMovies = json.decode(response.body);
+    }
   }
 
   Widget getImage(String image, {bool fullSize = false}) {
     return Image.network(
-      "${GlobalVars().serverUrl}/api/v1/get_movie_poster/$image-${fullSize ? 'horizontal' : 'vertical'}",
+      '${GlobalVars().serverUrl}/api/v1/get-movie-poster/$image-${fullSize ? 'horizontal' : 'vertical'}',
     );
   }
 
   ImageProvider getImageProvider(String image, {bool fullSize = false}) {
     return NetworkImage(
-      "${GlobalVars().serverUrl}/api/v1/get_movie_poster/$image-${fullSize ? 'horizontal' : 'vertical'}",
+      '${GlobalVars().serverUrl}/api/v1/get-movie-poster/$image-${fullSize ? 'horizontal' : 'vertical'}',
     );
   }
 
@@ -145,16 +175,16 @@ class UserInfo {
   dynamic prefs;
   bool initialized = false;
   Future? _doneFuture;
-  bool signedIn = false;
+  bool loggedIn = false;
 
   init() async {
     if (!initialized) {
       prefs = await SharedPreferences.getInstance();
-      if (prefs.getStringList("usercredentials") == null) {
-        prefs.setStringList("usercredentials", <String>[]);
+      if (prefs.getStringList('usercredentials') == null) {
+        prefs.setStringList('usercredentials', <String>[]);
       } else {
         userCredentials =
-            List<String>.from(prefs.getStringList("usercredentials")!);
+            List<String>.from(prefs.getStringList('usercredentials')!);
         if (userCredentials.length >= 2) {
           await UserInfo()
               .login(userCredentials[0], userCredentials[1], initialize: false);
@@ -179,34 +209,34 @@ class UserInfo {
       await _doneFuture;
     }
     var body = json.encode({
-      "email": email,
-      "password": password,
+      'email': email,
+      'password': password,
     });
 
     Map<String, String> headers = {
-      "Content-type": "application/json",
-      "Accept": "application/json",
+      'Content-type': 'application/json',
+      'Accept': 'application/json',
     };
     http.Response response;
     try {
       response = await http
-          .post(Uri.parse(GlobalVars().serverUrl + "/api/v1/login"),
+          .post(Uri.parse(GlobalVars().serverUrl + '/api/v1/login'),
               body: body, headers: headers)
           .timeout(const Duration(seconds: 5));
     } on TimeoutException {
-      return {"success": false, "message": "Server timed out"};
+      return {'success': false, 'message': 'Server timed out'};
     }
 
     if (response.statusCode == 200) {
       var body = json.decode(response.body);
-      if (body["success"]) {
+      if (body['success']) {
         userCredentials = [email, password];
-        prefs.setStringList("usercredentials", userCredentials);
-        signedIn = true;
-        return {"success": true};
+        prefs.setStringList('usercredentials', userCredentials);
+        loggedIn = true;
+        return {'success': true};
       }
     }
-    return {"success": false, "message": "Invalid credentials"};
+    return {'success': false, 'message': 'Invalid credentials'};
   }
 
   Future<Map<String, dynamic>> signup(
@@ -215,35 +245,72 @@ class UserInfo {
       await _doneFuture;
     }
     var body = json.encode({
-      "firstname": firstname,
-      "lastname": lastname,
-      "email": email,
-      "password": password,
+      'firstname': firstname,
+      'lastname': lastname,
+      'email': email,
+      'password': password,
     });
 
     Map<String, String> headers = {
-      "Content-type": "application/json",
-      "Accept": "application/json",
+      'Content-type': 'application/json',
+      'Accept': 'application/json',
     };
     http.Response response;
     try {
       response = await http
-          .post(Uri.parse(GlobalVars().serverUrl + "/api/v1/signup"),
+          .post(Uri.parse(GlobalVars().serverUrl + '/api/v1/signup'),
               body: body, headers: headers)
           .timeout(const Duration(seconds: 5));
     } on TimeoutException {
-      return {"success": false, "message": "Server timed out"};
+      return {'success': false, 'message': 'Server timed out'};
     }
     if (response.statusCode == 200) {
       var body = json.decode(response.body);
-      if (body["success"]) {
+      if (body['success']) {
         userCredentials = [email, password];
-        prefs.setStringList("usercredentials", userCredentials);
-        signedIn = true;
-        return {"success": true};
+        prefs.setStringList('usercredentials', userCredentials);
+        loggedIn = true;
+        return {'success': true};
       }
     }
-    return {"success": false, "message": "User already exists"};
+    return {'success': false, 'message': 'User already exists'};
+  }
+
+  Future<Map<String, dynamic>> getName() async {
+    if (!initialized) {
+      await _doneFuture;
+    }
+
+    if (userCredentials.length != 2) {
+      return {'success': false, 'message': 'Not logged in'};
+    }
+
+    var body = json.encode({
+      'email': userCredentials[0],
+    });
+
+    Map<String, String> headers = {
+      'Content-type': 'application/json',
+      'Accept': 'application/json',
+    };
+
+    http.Response items;
+    try {
+      items = await http
+          .post(Uri.parse(GlobalVars().serverUrl + '/api/v1/get-name'),
+              body: body, headers: headers)
+          .timeout(const Duration(seconds: 5));
+    } on TimeoutException {
+      return {'success': false, 'message': 'Server timed out'};
+    }
+
+    if (items.statusCode == 200) {
+      var body = json.decode(items.body);
+      if (body['success']) {
+        return body;
+      }
+    }
+    return {'success': false, 'message': 'User Not Found'};
   }
 
   void logout() async {
@@ -251,8 +318,8 @@ class UserInfo {
       await _doneFuture;
     }
     userCredentials = [];
-    signedIn = false;
-    prefs.setStringList("usercredentials", userCredentials);
+    loggedIn = false;
+    prefs.setStringList('usercredentials', userCredentials);
   }
 
   Future<Map<String, dynamic>> getCartItems() async {
@@ -261,36 +328,36 @@ class UserInfo {
     }
 
     if (userCredentials.length != 2) {
-      return {"success": false, "message": "Not logged in"};
+      return {'success': false, 'message': 'Not logged in'};
     }
 
     var body = json.encode({
-      "email": userCredentials[0],
-      "password": userCredentials[1],
+      'email': userCredentials[0],
+      'password': userCredentials[1],
     });
 
     Map<String, String> headers = {
-      "Content-type": "application/json",
-      "Accept": "application/json",
+      'Content-type': 'application/json',
+      'Accept': 'application/json',
     };
 
     http.Response items;
     try {
       items = await http
-          .post(Uri.parse(GlobalVars().serverUrl + "/api/v1/get_cart_items"),
+          .post(Uri.parse(GlobalVars().serverUrl + '/api/v1/get-cart-items'),
               body: body, headers: headers)
           .timeout(const Duration(seconds: 5));
     } on TimeoutException {
-      return {"success": false, "message": "Server timed out"};
+      return {'success': false, 'message': 'Server timed out'};
     }
 
     if (items.statusCode == 200) {
       var body = json.decode(items.body);
-      if (body["success"]) {
-        return {"success": true, "items": List<String>.from(body["items"])};
+      if (body['success']) {
+        return {'success': true, 'items': List<String>.from(body['items'])};
       }
     }
-    return {"success": false, "message": "User Not Found"};
+    return {'success': false, 'message': 'User Not Found'};
   }
 
   Future<Map<String, dynamic>> addItemToCart(String item) async {
@@ -300,35 +367,35 @@ class UserInfo {
 
     if (userCredentials.length != 2) {
       return {
-        "success": false,
-        "message": "Please Login or Sign Up Before Adding Items to Cart"
+        'success': false,
+        'message': 'Please Login or Sign Up Before Adding Items to Cart'
       };
     }
 
     var body = json.encode({
-      "email": userCredentials[0],
-      "password": userCredentials[1],
-      "item": item,
+      'email': userCredentials[0],
+      'password': userCredentials[1],
+      'item': item,
     });
 
     Map<String, String> headers = {
-      "Content-type": "application/json",
-      "Accept": "application/json",
+      'Content-type': 'application/json',
+      'Accept': 'application/json',
     };
 
     var response = await http
-        .post(Uri.parse(GlobalVars().serverUrl + "/api/v1/add_item_to_cart"),
+        .post(Uri.parse(GlobalVars().serverUrl + '/api/v1/add-item-to-cart'),
             body: body, headers: headers)
         .timeout(const Duration(seconds: 5));
 
     if (response.statusCode == 200) {
       var body = json.decode(response.body);
-      if (body["success"]) {
-        return {"success": true};
+      if (body['success']) {
+        return {'success': true};
       }
-      return {"success": false, "message": body["message"]};
+      return {'success': false, 'message': body['message']};
     }
-    return {"success": false, "message": "Could not complete request"};
+    return {'success': false, 'message': 'Could not complete request'};
   }
 
   Future<Map<String, dynamic>> removeItemFromCart(String item) async {
@@ -338,36 +405,36 @@ class UserInfo {
 
     if (userCredentials.length != 2) {
       return {
-        "success": false,
-        "message": "Please Login or Sign Up Before Removing Items from Cart"
+        'success': false,
+        'message': 'Please Login or Sign Up Before Removing Items from Cart'
       };
     }
 
     var body = json.encode({
-      "email": userCredentials[0],
-      "password": userCredentials[1],
-      "item": item,
+      'email': userCredentials[0],
+      'password': userCredentials[1],
+      'item': item,
     });
 
     Map<String, String> headers = {
-      "Content-type": "application/json",
-      "Accept": "application/json",
+      'Content-type': 'application/json',
+      'Accept': 'application/json',
     };
 
     var response = await http
-        .post(Uri.parse(GlobalVars().serverUrl + "/api/v1/remove_cart_item"),
+        .post(Uri.parse(GlobalVars().serverUrl + '/api/v1/remove-cart-item'),
             body: body, headers: headers)
         .timeout(const Duration(seconds: 5));
 
     if (response.statusCode == 200) {
       var body = json.decode(response.body);
-      if (body["success"]) {
-        return {"success": true};
-      } else if (body["message"] == "Item not found") {
-        return {"success": false, "message": "Item not found"};
+      if (body['success']) {
+        return {'success': true};
+      } else if (body['message'] == 'Item not found') {
+        return {'success': false, 'message': 'Item not found'};
       }
     }
-    return {"success": false, "message": "User not found"};
+    return {'success': false, 'message': 'User not found'};
   }
 
   Future<Map<String, dynamic>> getLibraryItems() async {
@@ -376,36 +443,36 @@ class UserInfo {
     }
 
     if (userCredentials.length != 2) {
-      return {"success": false, "message": "Not logged in"};
+      return {'success': false, 'message': 'Not logged in'};
     }
 
     var body = json.encode({
-      "email": userCredentials[0],
-      "password": userCredentials[1],
+      'email': userCredentials[0],
+      'password': userCredentials[1],
     });
 
     Map<String, String> headers = {
-      "Content-type": "application/json",
-      "Accept": "application/json",
+      'Content-type': 'application/json',
+      'Accept': 'application/json',
     };
 
     http.Response items;
     try {
       items = await http
-          .post(Uri.parse(GlobalVars().serverUrl + "/api/v1/get_library_items"),
+          .post(Uri.parse(GlobalVars().serverUrl + '/api/v1/get-library-items'),
               body: body, headers: headers)
           .timeout(const Duration(seconds: 5));
     } on TimeoutException {
-      return {"success": false, "message": "Server timed out"};
+      return {'success': false, 'message': 'Server timed out'};
     }
 
     if (items.statusCode == 200) {
       var body = json.decode(items.body);
-      if (body["success"]) {
-        return {"success": true, "items": List<String>.from(body["items"])};
+      if (body['success']) {
+        return {'success': true, 'items': List<String>.from(body['items'])};
       }
     }
-    return {"success": false, "message": "User Not Found"};
+    return {'success': false, 'message': 'User Not Found'};
   }
 
   Future<Map<String, dynamic>> addItemToLibrary(String item) async {
@@ -415,33 +482,33 @@ class UserInfo {
 
     if (userCredentials.length != 2) {
       return {
-        "success": false,
-        "message": "Please Login or Sign Up Before Adding Items to Cart"
+        'success': false,
+        'message': 'Please Login or Sign Up Before Adding Items to Cart'
       };
     }
 
     var body = json.encode({
-      "email": userCredentials[0],
-      "password": userCredentials[1],
-      "item": item,
+      'email': userCredentials[0],
+      'password': userCredentials[1],
+      'item': item,
     });
 
     Map<String, String> headers = {
-      "Content-type": "application/json",
-      "Accept": "application/json",
+      'Content-type': 'application/json',
+      'Accept': 'application/json',
     };
 
     var response = await http
-        .post(Uri.parse(GlobalVars().serverUrl + "/api/v1/add_item_to_library"),
+        .post(Uri.parse(GlobalVars().serverUrl + '/api/v1/add-item-to-library'),
             body: body, headers: headers)
         .timeout(const Duration(seconds: 5));
 
     if (response.statusCode == 200) {
       var body = json.decode(response.body);
-      if (body["success"]) {
-        return {"success": true};
+      if (body['success']) {
+        return {'success': true};
       }
     }
-    return {"success": false, "message": "User not found"};
+    return {'success': false, 'message': 'User not found'};
   }
 }

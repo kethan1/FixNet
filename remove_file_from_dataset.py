@@ -1,24 +1,25 @@
-import pymongo
-import gridfs
 import os
 import sys
+import pymongo
+import gridfs
 from dotenv import load_dotenv
 
 load_dotenv("server/.env")
 
-filesize = os.path.getsize(sys.argv[1])
 filename = os.path.basename(sys.argv[1]).split(".")[0]
-print(filesize)
 print(filename)
+
+if len(sys.argv) > 2:
+    collection_name = sys.argv[2]
 
 db_client = pymongo.MongoClient(f"mongodb+srv://{os.environ['user']}:{os.environ['password']}@full-stack-web-developm.m7o9n.mongodb.net/ecommerce_app?retryWrites=true&w=majority")
 
 db = db_client.ecommerce_app
+fs = gridfs.GridFS(db, collection=collection_name)
 
-fs = gridfs.GridFS(db)
-fileID = fs.put(open(sys.argv[1], 'rb'), name=os.path.basename(filename))
-out = fs.get(fileID)
-print(out.length)
+result = fs.find_one({"name": filename})
 
-if filesize != out.length:
-    print("Uploading of file failed")
+# now use the _id to delete the file
+files_id = result._id
+
+fs.delete(files_id)
