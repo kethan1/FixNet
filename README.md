@@ -1,5 +1,4 @@
-# CCI-Fair-1-2-2022
+# FixNet
 
 ## Future Improvements:
  - Deploy to web
- - Make the app look better
