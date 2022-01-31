@@ -174,6 +174,21 @@ def stream_movie(file_name):
     return response
 
 
+@app.route("/api/v1/stream-trailer/<file_name>", methods=["GET", "POST"])
+def stream_trailer(file_name):
+    db = mongo.db
+    fs = GridFS(db, collection="movie_trailers")
+    regex = re.compile(file_name + "-trailer", re.IGNORECASE)
+    f = fs.find_one({"name": regex})
+
+    if f is None:
+        raise ValueError("File not found!")
+
+    response = make_response(f.read())
+    response.mimetype = "video/mp4"
+    return response
+
+
 @app.route("/api/v1/get-movie-poster/<file_name>", methods=["GET", "POST"])
 def get_movie_poster(file_name):
     db = mongo.db
