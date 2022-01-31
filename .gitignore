@@ -1,5 +1,6 @@
 movies/
 moviePosters/
+trailers/
 *.mp4
 
 # Created by https://www.toptal.com/developers/gitignore/api/python

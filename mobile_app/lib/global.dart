@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class GlobalVars {
-  bool debug = true;
+  bool debug = false;
   late String serverUrl = debug
       ? (kIsWeb ? 'http://localhost:5000' : 'http://10.0.2.2:5000')
       : 'https://fixnet.herokuapp.com';
@@ -186,8 +186,8 @@ class UserInfo {
         userCredentials =
             List<String>.from(prefs.getStringList('usercredentials')!);
         if (userCredentials.length >= 2) {
-          await UserInfo()
-              .login(userCredentials[0], userCredentials[1], initialize: false);
+          await UserInfo().login(userCredentials[0], userCredentials[1],
+              initialize: false);
         }
       }
       initialized = true;
@@ -204,8 +204,8 @@ class UserInfo {
   UserInfo._internal();
 
   Future<Map<String, dynamic>> login(String email, String password,
-      {bool initialize = false}) async {
-    if (!initialized && !initialize) {
+      {bool initialize = true}) async {
+    if (!initialized && initialize) {
       await _doneFuture;
     }
     var body = json.encode({

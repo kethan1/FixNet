@@ -65,10 +65,13 @@ class _HomePageState extends State<HomePage> {
   Future getFeaturedMovies() async {
     await MoviesData().getFeaturedMovies();
     featuredMovies = MoviesData().featuredMovies;
+    if (movies == null) {
+      await getMovies();
+    }
   }
 
   List<Widget> getFeaturedMovieWidgets() {
-    if (MoviesData().featuredMovies == null) {
+    if (featuredMovies == null) {
       return [];
     }
 
@@ -97,7 +100,7 @@ class _HomePageState extends State<HomePage> {
               builder: (context, img) => SizedBox(
                 width: img.hasImage ? 375 : 0,
                 height: img.hasImage
-                    ? min((img.width! / 375) * img.height!, 180)
+                    ? min((img.width! / 375) * img.height!, 200)
                     : 0,
                 child: Image(
                   image: imageProviderWidget,
@@ -497,30 +500,31 @@ class _MoreInfoState extends State<MoreInfo> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         GestureDetector(
-                            onTap: () async {
-                              Map<String, dynamic> response = await UserInfo()
-                                  .addItemToCart(widget.itemTitle);
-                              if (!response['success']) {
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(SnackBar(
-                                  content: Text(response['message']),
-                                ));
-                              } else {
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(const SnackBar(
-                                  content: Text('Added to Cart!'),
-                                ));
-                              }
-                            },
-                            child: Wrap(
-                              children: const [
-                                Text('Add to Cart', style: _mediumFont),
-                                Icon(
-                                  Icons.add_shopping_cart_outlined,
-                                  color: Colors.black,
-                                ),
-                              ],
-                            )),
+                          onTap: () async {
+                            Map<String, dynamic> response = await UserInfo()
+                                .addItemToCart(widget.itemTitle);
+                            if (!response['success']) {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(
+                                content: Text(response['message']),
+                              ));
+                            } else {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(const SnackBar(
+                                content: Text('Added to Cart!'),
+                              ));
+                            }
+                          },
+                          child: Wrap(
+                            children: const [
+                              Text('Add to Cart', style: _mediumFont),
+                              Icon(
+                                Icons.add_shopping_cart_outlined,
+                                color: Colors.black,
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 10.0),
                         getImage(),
                         Text(widget.moviesInfo['description'],
@@ -556,7 +560,20 @@ class _MoreInfoState extends State<MoreInfo> {
                         }));
                       },
                       child: const Text('See Reviews', style: _mediumFont),
-                    )
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => WatchTrailer(
+                                title: widget.title,
+                                movieTitle: widget.itemTitle),
+                          ),
+                        );
+                      },
+                      child: const Text('Watch Trailer', style: _mediumFont),
+                    ),
                   ],
                 ),
               ),
@@ -788,44 +805,52 @@ class _AddReviewState extends State<AddReview> {
                 try {
                   await postReview();
                   Navigator.pushNamed(context, '/');
-
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                     content: Text('Sucessfully Posted Review'),
                   ));
                 } on UserForgot catch (e) {
-                  if (e.msg == 'select a rating') {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('Please Select a Rating'),
-                    ));
-                  } else if (e.msg == 'enter a review') {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('Please Enter a Review'),
-                    ));
-                  } else if (e.msg == 'review too short') {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('Please Enter a Longer Review'),
-                    ));
-                  } else if (e.msg == 'review too long') {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('Please Enter a Shorter Review'),
-                    ));
-                  } else if (e.msg == 'Not logged in') {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text(
-                          'Please Login or Sign Up Before Posting a Review'),
-                    ));
-                  } else if (e.msg == 'Server timed out') {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('Server Timed Out. Try Again'),
-                    ));
-                  } else if (e.msg == 'User Not Found') {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('User Not Found'),
-                    ));
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('An Error Occurred'),
-                    ));
+                  switch (e.msg) {
+                    case 'select a rating':
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('Please Select a Rating'),
+                      ));
+                      break;
+                    case 'enter a review':
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('Please Enter a Review'),
+                      ));
+                      break;
+                    case 'review too short':
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('Please Enter a Longer Review'),
+                      ));
+                      break;
+                    case 'review too long':
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('Please Enter a Shorter Review'),
+                      ));
+                      break;
+                    case 'Not logged in':
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text(
+                            'Please Login or Signup Before Posting review'),
+                      ));
+                      break;
+                    case 'Server timed out':
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('Server Timed Out. Try Again'),
+                      ));
+                      break;
+                    case 'User Not Found':
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('User Not Found'),
+                      ));
+                      break;
+                    default:
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('An Error Occurred'),
+                      ));
+                      break;
                   }
                 }
               },
@@ -1438,9 +1463,8 @@ class _WatchMovieState extends State<WatchMovie> {
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.network(GlobalVars().serverUrl +
-        '/api/v1/stream-movie/' +
-        widget.movieTitle.toLowerCase().replaceAll(' ', '_'));
+    _controller = VideoPlayerController.network(
+        '${GlobalVars().serverUrl}/api/v1/stream-movie/${widget.movieTitle.replaceAll(' ', '_')}');
     _controller!.initialize().then((_) {
       setState(() {
         _chewieController =
@@ -1474,7 +1498,66 @@ class _WatchMovieState extends State<WatchMovie> {
 
   @override
   void dispose() {
-    print(_chewieController);
+    _controller!.dispose();
+    _chewieController!.dispose();
+    super.dispose();
+  }
+}
+
+class WatchTrailer extends StatefulWidget {
+  const WatchTrailer({Key? key, required this.title, required this.movieTitle})
+      : super(key: key);
+
+  final String title;
+  final String movieTitle;
+
+  @override
+  _WatchTrailerState createState() => _WatchTrailerState();
+}
+
+class _WatchTrailerState extends State<WatchTrailer> {
+  VideoPlayerController? _controller;
+  ChewieController? _chewieController;
+  bool controllerInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.network(
+        '${GlobalVars().serverUrl}/api/v1/stream-trailer/${widget.movieTitle.replaceAll(' ', '_')}');
+    _controller!.initialize().then((_) {
+      setState(() {
+        _chewieController =
+            ChewieController(videoPlayerController: _controller!);
+        controllerInitialized = true;
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      drawer: GlobalVars().drawer(context, bigFont: _bigFont),
+      appBar: AppBar(
+        actions: [
+          Container(
+            child: (ModalRoute.of(context)?.canPop ?? false)
+                ? const BackButton()
+                : null,
+          )
+        ],
+        title: Text(widget.title),
+      ),
+      body: Center(
+        child: controllerInitialized
+            ? Chewie(controller: _chewieController!)
+            : Container(),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
     _controller!.dispose();
     _chewieController!.dispose();
     super.dispose();
